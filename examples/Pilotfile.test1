@@ -1,0 +1,40 @@
+# comments start with '#'
+
+# global job settings (settings start with '#$')
+
+#$ cwd
+#$ env
+#$ fq1=foo.fastq
+#$ fq2=bar.fastq
+
+# If you wanted to include other files, 
+# this is how you'd do it.
+#$ include <defaults> # loads from install lib/ folder
+#$ include 'other' # loads from local file 'other'
+
+# default job
+# ${fq1} is a required command-line arg
+# bake -fq1 filename.fastq
+all: ${fq1}.gz ${fq2}.gz
+    echo "hello"
+
+__pre__:
+	echo ${name}
+
+
+
+test: ${fq1}.gz ${fq2}.gz
+    echo "testing ${fq1}"
+
+# $1 is the glob/wildcard from the first output
+# in this case, if foo.fastq.gz was given, then 
+# $1 would be "foo".
+*.fastq.gz: ${1}.fastq
+    # job commands are indented (spaces or tabs)
+    # specific job settings (indicated by #$ prefix)
+    #$ ppn=3
+    #$ mem=2G
+    #$ name=gzip fastq
+
+    # $<1 is the first input, $>1 is the first output
+    gzip $<1 > $>1

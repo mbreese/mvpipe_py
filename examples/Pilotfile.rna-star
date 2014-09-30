@@ -1,0 +1,46 @@
+#$ ref=/srv/gsfs0/projects/cho/riboseq/star-index
+#$ gtf=/srv/gsfs0/projects/cho/references/ensembl.74.hg19.gtf.gz
+#$ library_type=RF
+
+#$ cwd
+#$ env
+
+__pre__:
+    module add cabiopeds/1
+
+__post__:
+    # pass
+
+all: ${base}.${org}.counts.txt ${base}.${org}.bam.stats.txt ${fq1}.stats.txt ${fq2}.stats.txt
+
+
+${base}.fastq.gz: ${fq1} ${fq2}
+    ngsutilsj fastq-merge ${fq1} ${fq2} | gzip > ${base}.fastq.gz
+
+*.filtered.fastq.gz: ${1}.fastq.gz
+    ngsutilsj fastq-filter --wildcard 2 --size 50 --suffixqual '\#' --paired $<1 | gzip > ${base}.filtered.fastq.gz
+
+*_fastqc.zip: ${1}.fastq.gz
+    fastqc --noextract $<1
+
+#*.gz: ${1}
+#    gzip $<1
+
+*.fastq.stats.txt: ${1}.fastq
+    fastqutils stats $<1 > .$>1.tmp && mv .$>1.tmp $>1
+
+*.fastq.stats.txt: ${1}.fastq.gz
+    fastqutils stats $<1 > .$>1.tmp && mv .$>1.tmp $>1
+
+*.${org}.bam: ${1}.filtered.fastq.gz
+    STAR --genomeDir ${ref} --readFilesIn $<1 --readFilesCommand zcat --runThreadN 8 --outFileNamePrefix %s/ --outSAMunmapped Within --outStd SAM  --outFilterIntronMotifs RemoveNoncanonical | samtools view -Sbu - | samtools sort - .$>1.tmp && mv .$>1.tmp.bam $>1
+
+*.bam.stats.txt: ${1}.bam
+    bamutils stats \
+    #%if ${gtf}
+    -gtf ${gtf} \
+    #%endif
+    $<1 > .$>1.tmp && mv .$>1.tmp $>1
+
+*.counts.txt: ${1}.bam
+    bamutils count -gtf ${gtf} -library ${library_type} $<1 > $>1
