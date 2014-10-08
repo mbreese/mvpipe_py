@@ -1,40 +1,135 @@
-# comments start with '#'
+##$ verbose # set verbosity
 
-# global job settings (settings start with '#$')
+# echo'd comments start with '#'
+## real comments start with '##'
 
-#$ cwd
-#$ env
+## global job settings (settings start with '#$')
+#$ job.cwd=T
+#$ job.env=T
 #$ fq1=foo.fastq
 #$ fq2=bar.fastq
+#$ job.ppn=2
+
+#$ foo = bar
+
+# foo = \${foo}!!!!
+# foo = ${foo}!!!!
+
+#$ include "Pilotfile.incl"
+# foo = ${foo}!!!!
+
+#$ if ${foo} == quux
+# foo is equal to quux - import worked!
+#$ else
+# foo is not equal to quux - import failed :(
+#$ endif
+
+## testing optional variables - add a ? to the end of the name
+# ???-${bar?}-??? <= should see "--"
+
+#$ if ${bar?}
+# bar is True?
+#$ else
+# bar is False!!!
+#$ endif
+
+
+#$ foo=bar # this is a comment
+#$ bar=baz
+
+#$ if ${foo} == bar
+#       foo is bar
+#$      if ${bar} == baz
+#           bar is baz
+#$          if ${baz?}
+#               baz is set
+#$          else
+#               baz is not set
+#$          endif
+#$      endif
+#$ else
+#       foo is not bar????
+#$ endif
+
 
 # If you wanted to include other files, 
 # this is how you'd do it.
-#$ include <defaults> # loads from install lib/ folder
-#$ include 'other' # loads from local file 'other'
+##$ include <defaults> # loads from install lib/ folder
+##$ include 'other' # loads from local file 'other'
 
 # default job
 # ${fq1} is a required command-line arg
-# bake -fq1 filename.fastq
+# pilot -fq1 filename.fastq -f Pilotfile
 all: ${fq1}.gz ${fq2}.gz
     echo "hello"
 
+#$ foo=foo
+
 __pre__:
-	echo ${name}
+    echo ${foo}
 
+#$ foo=bar
 
+__post__:
+    echo ${foo}
+
+#$ for i in 1..5
+#$   for j in 1..5
+#      i=${i}, j=${j}
+#$     if ${i} == 1
+#$       if ${j} == 2
+#        i is 1 and j is 2
+#$       endif
+#$     endif
+#$   done
+#$ done
 
 test: ${fq1}.gz ${fq2}.gz
     echo "testing ${fq1}"
 
+
+#$ num=5
+#$ all = []
+#$ for i in 1..${num}
+#$ all += test.${i}.txt
+
+test.${i}.txt: base.${i}.txt
+    echo "testing ${i}"
+
+#$ done
+
+# all = ${all}
+test_all: ${all}
+    echo "hello..."
+
+
+test2.@{1..${num}}.txt: base.@{1..${num}}.txt
+    # do nothing...
+    # files @{1..${num}}
+
+
+# all subst. test => files.\@{all}.ext
+# all subst. test => files.@{all}.ext
+
+# all = ${all}
+test2_all: test2.@{1..${num}}.txt
+
+
 # $1 is the glob/wildcard from the first output
 # in this case, if foo.fastq.gz was given, then 
 # $1 would be "foo".
-*.fastq.gz: ${1}.fastq
+%.fastq.gz: ${1}.fastq
     # job commands are indented (spaces or tabs)
     # specific job settings (indicated by #$ prefix)
-    #$ ppn=3
+    #$ job.ppn=8
     #$ mem=2G
     #$ name=gzip fastq
 
     # $<1 is the first input, $>1 is the first output
     gzip $<1 > $>1
+    # job.ppn=${job.ppn}
+    #$ if ${job.ppn} < 5
+    echo "small job"
+    #$else
+    echo "big job"
+    #$endif

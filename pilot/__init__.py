@@ -1,274 +1,277 @@
 import os
 import sys
-import re
 
-class Pilotfile(object):
-    def __init__(self, filename=None, args=None):
-        if not filename:
-            filename = 'Pilotfile'
+import context
+import support
 
-        if not os.path.exists(filename):
-            sys.stderr.write("%s file is missing!\n" % filename)
-            sys.exit(1)
+def parse(fname, args, verbose=False, **kwargs):
+    loader = PipelineLoader(args, verbose=verbose, **kwargs)
+    loader.load_file(fname)
 
-        self.global_settings = {}
-        self.jobdefs = []
+    if verbose:
+        for line in loader.context.out:
+            sys.stderr.write('%s\n' % line)
 
-        curjob = None
+    return loader
 
-        with open(filename) as f:
+
+class ParseError(Exception):
+    def __init__(self, s, parent=None):
+        Exception.__init__(self, s)
+        self.parent = parent
+
+
+class PipelineLoader(object):
+    def __init__(self, args, verbose=False):
+        self.context = context.RootContext(None, args, loader=self, verbose=verbose)
+        self.verbose = verbose
+        self.paths = []
+
+    def load_file(self, fname):
+        srcfile = None
+
+        if os.path.exists(fname):
+            # abs path (or current dir)
+            srcfile = fname
+
+        if not srcfile and self.paths:
+            # dir of the current file
+            if os.path.exists(os.path.join(self.paths[0], fname)):
+                srcfile = os.path.join(self.paths[0],fname)
+
+        if not srcfile:
+            # cwd
+            if os.path.exists(os.path.join(os.getcwd(), fname)):
+                srcfile = os.path.join(os.getcwd(),fname)
+
+        if not srcfile:
+            raise ParseError("Can not load file: %s" % fname)
+
+        if self.verbose:
+            sys.stderr.write("Loading file: %s\n" % (os.path.relpath(srcfile)))
+
+        with open(srcfile) as f:
+            self.paths.append(os.path.dirname(os.path.abspath(srcfile)))
             for i, line in enumerate(f):
-                if line[0] == '#':
-                    if line[1] == '$':
-                        k,v = _parse_setting(line[2:])
-                        self.global_settings[k]=v
-                elif line[0] in ' \t':
-                    if not curjob:
-                        sys.stderr.write("Line %s: No current job for command line!\n" % i)
-                        sys.exit(1)
-                    curjob.add_line(line.strip())
-                elif ':' in line[1:]:
-                    spl = _remove_comments(line).strip().split(':')
-                    if len(spl) != 2:
-                        sys.stderr.write("Line %s: Error parsing outputs / inputs!\n" % i)
-                        sys.exit(1)
-                    
-                    curjob = _JobDefinition([x for x in spl[0].split(' ') if x], [x for x in spl[1].split(' ') if x])
-                    self.jobdefs.append(curjob)
+                if not line or not line.strip():
+                    continue
 
-        for k in args:
-            self.global_settings[k] = args[k]
+                line = line.strip('\n')
 
-    def build(self, target, pipeline=None):
-        if not pipeline:
-            pre = None
-            post = None
-            for jd1 in self.jobdefs:
-                if jd1.orig_outputs[0] == '__pre__':
-                    pre = jd1
-                elif jd1.orig_outputs[0] == '__post__':
-                    post = jd1
+                if line[:2] == '##':
+                    continue
 
-            pipeline = _Pipeline(pre, post)
+                if line[:2] == '#$':
+                    spl = line[2:].split('#')
+                    line = '#$%s' % spl[0]
+                    line = line.strip()
+                    if not line:
+                        continue
 
-        # TODO: Make this support multiple possible targets? (.fastq and .fastq.gz)
+                try:
+                    # if self.verbose:
+                    #     sys.stderr.write('>>> %s\n' % line)
 
-        jd = None
+                    self.context.parse_line(line)
 
-        for jd1 in self.jobdefs:
-            if target:    
-                match, wildcards = jd1.match_output(target, self.global_settings)
-                if match:
-                    jd = jd1
-                    break
-            else:
-                if jd1.orig_outputs[0] not in  ['__pre__', '__post__']:
-                    match, wildcards = jd1.match_output(target, self.global_settings)
-                    jd = jd1
-                    break
+                except ParseError, e:
+                    sys.stderr.write('ERROR: %s\n[%s:%s] %s\n\n' % (e, fname, i+1, line))
+                    sys.stderr.write('%s\n' % self.context.lastchild)
+                    sys.exit(1)
+
+            self.paths = self.paths[:-1]
 
 
-        if match:
-            args = {}
-            for k in self.global_settings:
-                args[k] = self.global_settings[k]
-            for k in jd.settings:
-                args[k] = jd.settings[k]
+    def build(self, target):
+        pre = []
+        post = []
 
-            inputs = []
-            for inp in jd.inputs:
-                inputs.append(_parse_input(inp, wildcards, args))
+        for tgt in self.context._targets:
+            if '__pre__' in tgt.outputs:
+                pre = tgt.eval()
 
-            for inp in inputs:
-                if not os.path.exists(inp):
-                    self.build(inp, pipeline)
+        for tgt in self.context._targets:
+            if '__post__' in tgt.outputs:
+                post = tgt.eval()
 
-            pipeline.add(jd, wildcards, args, inputs)
+        valid, jobtree = self._build(target, pre, post)
 
+        if valid:
+            return jobtree.prune()
         else:
-            sys.stderr.write("Unknown target: %s\n\n" % target)
-            sys.exit(1)
-
-        return pipeline
-
-    def _process_line(self, line):
-        pass
+            sys.stderr.write("ERROR: Can't build target: %s\n" % (target if target else '*default*'))
+            if jobtree.lasterror._exception:
+                sys.stderr.write("%s\n" % jobtree.lasterror._exception)
 
 
-class _JobDefinition(object):
-    def __init__(self, outputs, inputs):
-        # sys.stderr.write("outputs: %s, inputs: %s\n" % (outputs, inputs))
-        self.orig_outputs = outputs
-        self.outputs = []
+    def _build(self, target, pre, post):
+        if target and support.target_exists(target):
+            return True, None
 
-        for out in outputs:
-            regex = '^%s$' % out.replace(".", "\.").replace("(", "\(").replace(")", "\)").replace('*', '(.*)')
-            # print out, regex
-            self.outputs.append(regex)
+        for tgt in self.context._targets:
+            if '__pre__' in tgt.outputs or '__post__' in tgt.outputs:
+                continue
 
-        self.inputs = inputs
-        self.settings = {}
-        self.commands = []
+            match, numargs, outputs = tgt.match_target(target)
+            if match:
+                good_inputgroup = False
+                jobdef = JobDef(tgt, outputs, numargs, pre, post)
+                exception = None
 
-    def __repr__(self):
-        if 'name' in self.settings:
-            return 'job.%s' % (self.settings['name'].replace(' ', '.'))
-        return 'job.%s' % self.orig_outputs[0]
+                for inputgroup in tgt.inputs:
+                    good_inputgroup = False
+                    jobdef.reset()
 
-    def add_line(self, line):
-        line = line.strip()
-        if line[0] == '#':
-            if line[1] == '$':
-                k,v = _parse_setting(line[2:])
-                self.settings[k]=v
-        else:
-            self.commands.append(_remove_comments(line))
+                    for inputstr in inputgroup:
+                        good_inputgroup = True
 
-    def match_output(self, target, args):
-        wildcards = []
-        for out_templ in self.outputs:
-            # print "checking %s vs %s" % (target, out_templ) ,
+                        try:
+                            inputs = tgt.replace_token(inputstr, numargs)
+                            if ' ' in inputs:
+                                inputs = inputs.split()
+                            else:
+                                inputs = [inputs,]
 
-            out = re.compile(_replace_args(out_templ, args))
+                            for next in inputs:
+                                jobdef.add_input(next)
 
+                                if not support.target_exists(next):
+                                    isvalid, dep = self._build(next, pre, post)
+                                    if dep:
+                                        jobdef.add_dep(dep)
 
-            if not target:
-                wildcards.append('')
-                # print "MATCH (null)"
-            else:
-                m = out.match(target)
-                if m:
-                    # print "MATCH (%s)" % m
-                    if m.groups():
-                        wildcards.append(m.group(1))
-                    else:
-                        wildcards.append('')
+                                    if not isvalid:
+                                        good_inputgroup = False
+                                        exception = "Missing file: %s" % next
+                                        break
+
+                        except Exception, e:
+                            exception = e
+                            good_inputgroup = False
+                            break
+
+                    if good_inputgroup:
+                        break
+
+                if good_inputgroup:
+                    return True, jobdef
                 else:
-                    # print "NO MATCH"
-                    return False, None
+                    jobdef.seterror(exception)
+                    return False, jobdef
 
-        return True, wildcards
+        return False, None
 
 
-class _Pipeline(object):
-    def __init__(self, pre=None, post=None):
-        self.jobs = []
+class JobDef(object):
+    def __init__(self, target, outputs, numargs, pre=None, post=None):
+        self.target = target
+        self.outputs = outputs
+        self.numargs = numargs
         self.pre = pre
         self.post = post
 
-    def add(self, job_def, wildcards, args, inputs):
-        self.jobs.append((job_def, wildcards, args, inputs))
+        self.inputs = []
+        self.depends = []
 
-    def run(self, args):
-        already_run = {}
-        jid=1
+        self._error = False
+        self._exception = None
 
-        precmds = []
-        postcmds = []
+        self._reset_count = 0
 
+    def reset(self):
+        self._reset_count += 1
+        self.inputs = []
+        self.depends = []
+
+    def add_input(self, inp):
+        self.inputs.append(inp)
+
+    def add_dep(self, child):
+        self.depends.append(child)
+
+    def __repr__(self):
+        return '<%s|%s>: (%s)' % (', '.join(self.outputs), self._reset_count, ', '.join(self.inputs))
+
+    @property
+    def error(self):
+        return self._error
+
+    @property
+    def lasterror(self):        
+        for c in self.depends:
+            if c.lasterror:
+                return c
+
+        if self._error:
+            return self
+
+        return None
+
+    def seterror(self, exception):
+        self._error = True
+        self._exception = exception
+
+    @property
+    def src(self):
+        src_lines = []
+
+        for line in self.target.eval(self.outputs, self.inputs, self.numargs):
+            src_lines.append(line)
+
+        if not src_lines:
+            return ''
+        
         if self.pre:
-            for cmd in self.pre.commands:
-                for k in args:
-                    cmd = cmd.replace('${%s}' % k, args[k])
-
-                precmds.append(cmd)
+            for i, line in enumerate(self.pre):
+                src_lines.insert(i,line)
 
         if self.post:
-            for cmd in self.post.commands:
-                for k in args:
-                    cmd = cmd.replace('${%s}' % k, args[k])
-                
-                postcmds.append(cmd)
+            for line in self.post:
+                src_lines.append(line)
+
+        return '\n'.join(src_lines)
+
+    def prune(self, jobs=None, outputs=None):
+        if jobs is None:
+            jobs = []
+            outputs = {}
+
+        for out in self.outputs:
+            if not out in outputs:
+                jobs.append(self)
+                for o in self.outputs:
+                    outputs[o] = self
+                break
+
+        for dep in self.depends:
+            dep.prune(jobs, outputs)
+
+        self.depends = []
+
+        for inp in self.inputs:
+            if not support.target_exists(inp):
+                if not outputs[inp] in self.depends:
+                    self.depends.append(outputs[inp])
+
+        return jobs
 
 
-        for job in self.jobs:
-            myouts = []
-            for templ, wildcard in zip(job[0].orig_outputs, job[1]):
-                if templ and wildcard:
-                    myouts.append(_replace_args(templ.replace('*', wildcard), job[2]))
-                else:
-                    myouts.append(_replace_args(templ, job[2]))
+    def _print(self, lines=None, i=0):
+        if not lines:
+            lines = []
+        
+        indent = ' ' * (i*2)
+        lines.append('%s%s' % (indent, self))
 
-            needtorun = False
-            for out in myouts:
-                if out not in already_run:
-                    needtorun = True
-                    break
+        for c in self.depends:
+            c._print(lines, i+1)
 
+        return '\n'.join(lines)
 
-            if needtorun:
-                # print "RUNNING JOB: %s" % job[0]
-                # print "OUTPUTS: %s" % job[0].orig_outputs
-                # print "WILDCARDS: %s" % job[1]
-                # print "OUTPUTS: %s" % myouts
-                # print "ARGS: %s" % job[2]
-                # print "INPUTS: %s" % job[3]
-                # print job[0].commands
-                # print "---------------"
+    def _dump(self):
+        # for dep in self.depends:
+        #     dep._dump()
 
-                cmds = []
-
-                for cmd in job[0].commands:
-                    for i, out in enumerate(myouts):
-                        cmd = cmd.replace('$>%s' % (i+1), out)
-                    for i, inp in enumerate(job[3]):
-                        cmd = cmd.replace('$<%s' % (i+1), inp)
-                    for k in job[2]:
-                        cmd = cmd.replace('${%s}' % k, str(job[2][k]))
-
-                    if cmd.strip():
-                        cmds.append(cmd)
-
-                if cmds:
-                    #print '# %s' % _replace_args(str(job[0]),job[2])
-                    print ''
-                    print '# jobid: %s' % jid
-
-                    print '# OUT: %s' % '\n# OUT: '.join(myouts)
-                    print '# IN: %s' % '\n# IN: '.join(job[3])
-
-                    for inp in job[3]:
-                        if inp in already_run:
-                            print '# JOBDEP: %s' % already_run[inp]
+        sys.stderr.write('\n%s\n--------\n - (%s)\n - %s\n%s\n\n' % (self, ','.join([str(x) for x in self.depends]), self.target._values, self.src))
 
 
-                    print '\n'.join(precmds)
-                    print '\n'.join(cmds)
-                    print '\n'.join(postcmds)
-
-                    for out in myouts:
-                        already_run[out] = jid
-                    jid += 1
-
-
-def _remove_comments(line):
-    spl = line.split('#',1)
-
-    if spl[0] and len(spl) == 2 and spl[0][-1] == '\\':
-        return ('%s#%s' % (spl[0][:-1], spl[1])).strip()
-    else:
-        return spl[0].strip()
-
-    
-
-def _parse_setting(line):
-    body = _remove_comments(line)
-    if '=' in body:
-        return body.split('=', 1)
-    else:
-        return (body, True)
-
-def _replace_args(inp, args):
-    s = inp
-    for k in args:
-        s=s.replace('${%s}' % k, str(args[k]))
-
-    return s
-
-def _parse_input(inp, wildcards, args):
-    s = inp
-    for i, val in enumerate(wildcards):
-        if val:
-            s=s.replace('${%s}' % (i+1), val)
-
-    return _replace_args(s, args)
