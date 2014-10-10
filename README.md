@@ -19,5 +19,8 @@ Make is a powerful tool, but it is sometimes difficult to integrate into
 bioinformatics pipelines. Bioinformatics pipelines are typically run on an
 HPC/HTC cluster using a batch scheduler. Each job could have different IO, 
 memory, or CPU requirements. Finally, each pipeline could have to run on 
-different clusters. Currently, only SGE/Open Grid includes a grid-aware make
-replacement. MVpipe 
+different clusters. Currently, only SGE/OGE and Grid Engine derivatives include
+a grid-aware make replacement. However, it is primarily aimed at directly building
+Makefiles, and that is somewhat limiting for more complicated pipelines.
+
+

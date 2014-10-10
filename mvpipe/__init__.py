@@ -18,12 +18,14 @@ def load_config(fname):
     return config
 
 
-def parse(fname, args, verbose=False, **kwargs):
+def parse(fname, args, verbose=False, logfile=None, **kwargs):
     config = load_config(CONFIG_FILE)
     for k in args:
         config[k] = args[k]
 
     loader = PipelineLoader(config, verbose=verbose, **kwargs)
+    if logfile:
+        loader.set_log(logfile)
     loader.load_file(fname)
     return loader
 
@@ -40,9 +42,6 @@ class PipelineLoader(object):
         self.verbose = verbose
         self.paths = []
         self.logger = None
-
-        if 'mvpipe.log' in args:
-            self.logger = logger.FileLogger(args['mvpipe.log'])
 
     def close(self):
         if self.logger:
@@ -78,7 +77,7 @@ class PipelineLoader(object):
                 srcfile = os.path.join(os.getcwd(),fname)
 
         if not srcfile:
-            raise ParseError("Can not load file: %s" % fname)
+            raise ParseError("Error loading file: %s" % fname)
 
         self.log("Loading file: %s" % (os.path.relpath(srcfile)))
 

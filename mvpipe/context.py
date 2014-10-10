@@ -81,9 +81,23 @@ class ExecContext(object):
             return True
         if self.parent:
             return self.parent._contains_set(k,v)
+        return False
+
+    def contains(self, k):
+        if k in self._values:
+            return True
+        if self.parent:
+            return self.parent.contains(k)
+        return False
 
     def set(self, k, v):
         if not self._contains_set(k, v):
+            self._values[k] = v
+
+    def set_ine(self, k, v):
+        # set the value if it doesn't already exist
+        # (allows for defaults to be given on command-line)
+        if not self.contains(k):
             self._values[k] = v
 
     def append(self, k, v):
@@ -330,7 +344,7 @@ class ExecContext(object):
 
         line = line[2:].strip()
 
-        for op in [ops.setop, ops.unsetop, ops.appendop, ops.ifop, ops.forop]:
+        for op in [ops.setop, ops.setineop, ops.unsetop, ops.appendop, ops.ifop, ops.forop]:
             if op(self, line):
                 return True
 

@@ -18,6 +18,22 @@ def setop(context, line):
         return True
     return False
 
+regex_setine = re.compile('^([A-Za-z_\.][A-Za-z0-9_\.]*)[ \t]*\+=\?[ \t]*(.*)$')
+def setineop(context, line):
+    m = regex_setine.match(line)
+    if m:
+        if not context.active:
+            return True
+
+        k = m.group(1)
+        v = autotype(context.replace_token(m.group(2)))
+        if v == '[]':
+            v = []
+        context.set_ine(k, v)
+
+        return True
+    return False
+
 regex_append = re.compile('^([A-Za-z_\.][A-Za-z0-9_\.]*)[ \t]*\+=[ \t]*(.*)$')
 def appendop(context, line):
     m = regex_append.match(line)

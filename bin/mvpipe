@@ -4,8 +4,31 @@ import os
 import mvpipe
 import mvpipe.runner.bash
 
+def usage():
+
+    msg="""\
+MVpipe - HPC/HTC analysis pipelines
+
+Usage: mvpipe {options} {args} target
+
+Options:
+    -f filename    Pipeline definition to be read (default: ./Pipeline)
+    -l logfile     Log debug output to this file (default: none)
+    target         The target to build (default: first target)
+
+    Additional arguments for the pipeline can be set by using the format:
+        -foo bar -arg one -arg two
+
+    This will set the variable "foo" to be "bar", and "arg" to be a list:
+    ["one", "two"]. These variables can then be used by the Pipeline script.
+
+"""
+
+    sys.stderr.write(msg)
+
 if __name__ == '__main__':
     fname = None
+    logfile = None
     args = {}
     target = None
     verbose = False
@@ -21,6 +44,8 @@ if __name__ == '__main__':
                     sys.stderr.write("Can't find file: %s\n", arg)
                     sys.exit(1)
                 fname = arg
+            elif last == 'l':
+                logfile = arg
             else:
                 if last in args:
                     args[last] = [args[last], arg]
@@ -40,10 +65,13 @@ if __name__ == '__main__':
     if not fname:
         fname = 'Pipeline'
 
-    pipe = mvpipe.parse(fname, args, verbose=verbose)
-    runner = mvpipe.runner.get_runner()
+    try:
+        pipe = mvpipe.parse(fname, args, logfile=logfile, verbose=verbose)
+        runner = mvpipe.runner.get_runner()
 
-    pipe.build(target, runner)
+        pipe.build(target, runner)
 
-    runner.done()
-    pipe.close()
+        runner.done()
+        pipe.close()
+    except:
+        usage()
