@@ -1,8 +1,6 @@
-##$ verbose # set verbosity
-
 # echo'd comments start with '#'
 ## real comments start with '##'
-
+##$ log "test1.log"
 ## global job settings (settings start with '#$')
 #$ job.cwd=T
 #$ job.env=T
@@ -10,12 +8,14 @@
 #$ fq2=bar.fastq
 #$ job.ppn=2
 
+# env['BAR'] = "${BAR?}"
+
 #$ foo = bar
 
 # foo = \${foo}!!!!
 # foo = ${foo}!!!!
 
-#$ include "Pilotfile.incl"
+#$ include "Pipeline.incl"
 # foo = ${foo}!!!!
 
 #$ if ${foo} == quux
@@ -59,9 +59,8 @@
 
 # default job
 # ${fq1} is a required command-line arg
-# pilot -fq1 filename.fastq -f Pilotfile
-all: ${fq1}.gz ${fq2}.gz
-    echo "hello"
+# mvpipe -fq1 filename.fastq -f Pipeline
+all: test
 
 #$ foo=foo
 
@@ -106,7 +105,7 @@ test_all: ${all}
 test2.@{1..${num}}.txt: base.@{1..${num}}.txt
     # do nothing...
     # files @{1..${num}}
-
+    touch $>
 
 # all subst. test => files.\@{all}.ext
 # all subst. test => files.@{all}.ext
@@ -118,15 +117,19 @@ test2_all: test2.@{1..${num}}.txt
 # $1 is the glob/wildcard from the first output
 # in this case, if foo.fastq.gz was given, then 
 # $1 would be "foo".
+#$ job.ppn=4
 %.fastq.gz: ${1}.fastq
     # job commands are indented (spaces or tabs)
     # specific job settings (indicated by #$ prefix)
+    # wild/1 = \${1} = ${1}
+    #$ if ${1} == "foo"
     #$ job.ppn=8
+    #$ endif
     #$ mem=2G
     #$ name=gzip fastq
 
     # $<1 is the first input, $>1 is the first output
-    gzip $<1 > $>1
+    gzip -c $<1 > $>1
     # job.ppn=${job.ppn}
     #$ if ${job.ppn} < 5
     echo "small job"

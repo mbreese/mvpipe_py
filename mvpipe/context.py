@@ -1,9 +1,10 @@
+import os
 import re
 import sys
 import subprocess
 
 import ops
-import pilot
+import mvpipe
 
 class ExecContext(object):
     def __init__(self, parent=None, initvals=None, verbose=False):
@@ -58,6 +59,8 @@ class ExecContext(object):
         if self.parent:
             return self.parent.get(k)
 
+        if k in os.environ:
+            return os.environ[k]
         return None
 
     def _contains_append(self, k, v):
@@ -110,7 +113,7 @@ class ExecContext(object):
             return self.child.parse_line(line)
 
         if not self.eval_line(line):
-            raise pilot.ParseError("Don't know how to parse line")
+            raise mvpipe.ParseError("Don't know how to parse line")
 
     def replace_token(self, token, numargs=None):
         if not token:
@@ -144,7 +147,7 @@ class ExecContext(object):
 
                 if val is None:
                     if not allow_missing:
-                        raise pilot.ParseError("Variable \"%s\" not found!" % k)
+                        raise mvpipe.ParseError("Variable \"%s\" not found!" % k)
                     else:
                         val = ''
 
@@ -172,7 +175,7 @@ class ExecContext(object):
                 val = self.get(k)
 
                 if val is None:
-                    raise pilot.ParseError("Variable \"%s\" not found!" % k)
+                    raise mvpipe.ParseError("Variable \"%s\" not found!" % k)
 
                 if type(val) != list:
                     val = [val,]
@@ -195,13 +198,13 @@ class ExecContext(object):
                 # print "var found => %s" % m.group(2)
 
                 allow_missing = False
-                frm = pilot.support.autotype(self.replace_token(m.group(3)))
-                to = pilot.support.autotype(self.replace_token(m.group(4)))
+                frm = mvpipe.support.autotype(self.replace_token(m.group(3)))
+                to = mvpipe.support.autotype(self.replace_token(m.group(4)))
 
                 if type(frm) != int:
-                    raise pilot.ParseError("Invalid range start \"%s\"!" % frm)
+                    raise mvpipe.ParseError("Invalid range start \"%s\"!" % frm)
                 if type(to) != int:
-                    raise pilot.ParseError("Invalid range end \"%s\"!" % to)
+                    raise mvpipe.ParseError("Invalid range end \"%s\"!" % to)
 
                 ins_vals = []
                 for i in range(frm, to+1):
@@ -214,7 +217,7 @@ class ExecContext(object):
 
         # given numarg-replace
         if numargs:
-            regex = re.compile('^(.*)\$\{([0-9]*)\}(.*)$')
+            regex = re.compile('^(.*)\$\{([0-9]+)\}(.*)$')
             m = regex.match(token)
 
             while m:
@@ -225,7 +228,7 @@ class ExecContext(object):
                         token = '%s%s%s' % (m.group(1), numargs[mi], m.group(3))
                         m = regex.match(token)
                     else:
-                        raise pilot.ParseError("Unknown num-arg: ${%s}" % m.group(2))
+                        raise mvpipe.ParseError("Unknown num-arg: ${%s}" % m.group(2))
                 else:
                     m = None
 
@@ -233,7 +236,7 @@ class ExecContext(object):
 
         # global numarg-replace
         if self._var_numargs:
-            regex = re.compile('^(.*)\$\{([0-9]*)\}(.*)$')
+            regex = re.compile('^(.*)\$\{([0-9]+)\}(.*)$')
             m = regex.match(token)
 
             while m:
@@ -244,7 +247,7 @@ class ExecContext(object):
                         token = '%s%s%s' % (m.group(1), self._var_numargs[mi], m.group(3))
                         m = regex.match(token)
                     else:
-                        raise pilot.ParseError("Unknown num-arg: ${%s}" % m.group(2))
+                        raise mvpipe.ParseError("Unknown num-arg: ${%s}" % m.group(2))
                 else:
                     m = None
 
@@ -261,9 +264,9 @@ class ExecContext(object):
                         token = '%s%s%s' % (m.group(1), self._var_inputs[mi], m.group(3))
                         m = regex.match(token)
                     else:
-                        raise pilot.ParseError("Unknown input-num: $<%s" % m.group(2))
+                        raise mvpipe.ParseError("Unknown input-num: $<%s" % m.group(2))
                 else:
-                    m = None
+                    token = '%s%s%s' % (m.group(1), ' '.join(self._var_inputs), m.group(3))
 
         # outputs-replace
         if self._var_outputs:
@@ -276,11 +279,14 @@ class ExecContext(object):
                     if mi < len(self._var_outputs):
                         # print "var found => %s" % m.group(2)
                         token = '%s%s%s' % (m.group(1), self._var_outputs[mi], m.group(3))
-                        m = regex.match(token)
                     else:
-                        raise pilot.ParseError("Unknown output-num: $>%s" % m.group(2))
+                        raise mvpipe.ParseError("Unknown output-num: $>%s" % m.group(2))
                 else:
-                    m = None
+                    token = '%s%s%s' % (m.group(1), ' '.join(self._var_outputs), m.group(3))
+
+                m = regex.match(token)
+
+
 
         # shell-out
         regex = re.compile('^(.*)\$\((.*)\)(.*)$')
@@ -299,7 +305,7 @@ class ExecContext(object):
                     sys.stderr.write('$(%s) => %s\n' % (cmd, err))
 
                 if proc.returncode != 0:
-                    raise pilot.ParseError("Error running shell command: %s" % cmd)
+                    raise mvpipe.ParseError("Error running shell command: %s" % cmd)
                 token = '%s%s%s' % (m.group(1), out.strip(), m.group(3))
 
                 m = regex.match(token)
@@ -325,7 +331,7 @@ class ExecContext(object):
         line = line[2:].strip()
 
         for op in [ops.setop, ops.unsetop, ops.appendop, ops.ifop, ops.forop]:
-            if op(self, line, self.verbose):
+            if op(self, line):
                 return True
 
         return False
@@ -344,7 +350,10 @@ class RootContext(ExecContext):
         else:
             if line[:2] == '#$':
                 # If this isn't a normal line, check for an import
-                if ops.includeop(self, line[2:].strip(), self.verbose):
+                if ops.includeop(self, line[2:].strip()):
+                    return True
+
+                if ops.logop(self, line[2:].strip()):
                     return True
 
         return False
@@ -358,7 +367,7 @@ class IfContext(ExecContext):
     def eval_line(self, line):
         if line[:2] == '#$':
             for op in [ops.elseop, ops.endifop]:
-                if op(self, line[2:].strip(), self.verbose):
+                if op(self, line[2:].strip()):
                     return True
         return ExecContext.eval_line(self, line)
 
@@ -372,7 +381,7 @@ class ElseContext(ExecContext):
     def eval_line(self, line):
         if line[:2] == '#$':
             for op in [ops.endifop,]:
-                if op(self, line[2:].strip(), self.verbose):
+                if op(self, line[2:].strip()):
                     return True
 
         return ExecContext.eval_line(self, line)
