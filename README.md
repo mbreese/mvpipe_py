@@ -96,7 +96,12 @@ Targets are defined by...
 
     ${var}          - Variable named "var". If "var" is a list, ${var} will
                       be replaced with a space-delimited string with all
-                      members of the list
+                      members of the list. If "var" hasn't been set, then this
+                      will throw a ParseError exception.
+
+    ${var?}         - Optional variable substitution. This is the same as
+                      above, except that if "var" hasn't been set, then it will
+                      be replaced with an empy string: ''.
 
     foo_@{var}_bar  - An replacement list, capturing the surrounding context.
                       For each member of list, the following will be returned:
