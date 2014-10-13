@@ -42,9 +42,12 @@ def appendop(context, line):
             return True
 
         k = m.group(1)
-        vals = [autotype(x) for x in context.replace_token(m.group(2)).split(' ')]
-        for v in vals:
-            context.append(k, v)
+        vals = autotype(context.replace_token(m.group(2)))
+        if type(vals) == list:
+            for v in vals:
+                context.append(k, v)
+        else:
+            context.append(k,vals)
 
         return True
     return False

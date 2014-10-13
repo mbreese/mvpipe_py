@@ -1,8 +1,14 @@
 #!/usr/bin/env python
 import sys
 import os
-import mvpipe
-import mvpipe.runner.bash
+
+
+try:
+    import mvpipe
+except:
+    sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+    import mvpipe
+
 
 def usage():
 
@@ -14,10 +20,13 @@ Usage: mvpipe {options} {args} target
 Options:
     -f filename    Pipeline definition to be read (default: ./Pipeline)
     -l logfile     Log debug output to this file (default: none)
+    -v             Verbose logging
+    -dr            Dry run - don't actually submit jobs
+
     target         The target to build (default: first target)
 
     Additional arguments for the pipeline can be set by using the format:
-        -foo bar -arg one -arg two
+        --foo bar --arg one --arg two
 
     This will set the variable "foo" to be "bar", and "arg" to be a list:
     ["one", "two"]. These variables can then be used by the Pipeline script.
@@ -25,18 +34,20 @@ Options:
 """
 
     sys.stderr.write(msg)
+    sys.exit(1)
 
 if __name__ == '__main__':
     fname = None
     logfile = None
     args = {}
-    target = None
+    target = []
     verbose = False
+    dryrun = False
 
     last = None
     for arg in sys.argv[1:]:
         if last:
-            if last == 'f':
+            if last == '-f':
                 if fname:
                     sys.stderr.write("You can only specify one file (-f)!\n")
                     sys.exit(1)
@@ -44,34 +55,41 @@ if __name__ == '__main__':
                     sys.stderr.write("Can't find file: %s\n", arg)
                     sys.exit(1)
                 fname = arg
-            elif last == 'l':
+            elif last == '-l':
                 logfile = arg
-            else:
-                if last in args:
-                    args[last] = [args[last], arg]
+            elif last[:2] == '--':
+                var = last[2:]
+                if var in args:
+                    if type(args[var]) == list:
+                        args[var].append(arg)
+                    else:
+                        args[var] = [args[var], arg]
                 else:
-                    args[last] = arg
+                    args[var] = arg
             last = None
         elif arg == '-v':
             verbose = True
+        elif arg == '-dr':
+            dryrun = True
+        elif arg in ['-h', '-help', '--help']:
+            usage()
         elif arg[0] == '-':
-            last = arg[1:]
-        elif not target:
-            target = arg
+            last = arg
         else:
-            sys.stderr.write("Don't know how to deal with argument: %s\n" % arg)
-            sys.exit(1)
+            target.append(arg)
+        # else:
+        #     sys.stderr.write("Don't know how to deal with argument: %s\n" % arg)
+        #     sys.exit(1)
 
     if not fname:
         fname = 'Pipeline'
 
+    pipe = mvpipe.parse(fname, args, logfile=logfile, dryrun=dryrun, verbose=verbose)
+
     try:
-        pipe = mvpipe.parse(fname, args, logfile=logfile, verbose=verbose)
-        runner = mvpipe.runner.get_runner()
-
-        pipe.build(target, runner)
-
-        runner.done()
+        for t in target:
+            pipe.build(t)
         pipe.close()
-    except:
-        usage()
+    except Exception, e:
+        pipe.abort()
+        sys.stderr.write('%s\n' % e)

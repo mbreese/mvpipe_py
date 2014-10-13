@@ -1,10 +1,10 @@
 import os
 import re
-import sys
 import subprocess
 
 import ops
 import mvpipe
+import mvpipe.runner
 
 class ExecContext(object):
     def __init__(self, parent=None, initvals=None, verbose=False):
@@ -170,7 +170,7 @@ class ExecContext(object):
             else:
                 m = None
 
-        # var-replace arrays - replace foo@{bar}baz with space delimited versions... foobar1baz foobar2baz foobar3baz...
+        # var-replace arrays - replace foo_@{bar}_baz with space delimited versions... foo_bar1_baz foo_bar2_baz foo_bar3_baz...
         regex_array = re.compile('^(.*?)([A-Za-z0-9_\-\.]*)\@\{([a-zA-Z_][a-zA-Z0-9_\.]*)\}([A-Za-z0-9_\-\.]*)(.*)$')
         m = regex_array.match(token)
 
@@ -273,7 +273,7 @@ class ExecContext(object):
             while m:
                 if m.group(2):
                     mi = int(m.group(2)) - 1
-                    if mi < len(self._var_inputs):
+                    if 0 <= mi and mi < len(self._var_inputs):
                         # print "var found => %s" % m.group(2)
                         token = '%s%s%s' % (m.group(1), self._var_inputs[mi], m.group(3))
                         m = regex.match(token)
@@ -300,8 +300,6 @@ class ExecContext(object):
 
                 m = regex.match(token)
 
-
-
         # shell-out
         regex = re.compile('^(.*)\$\((.*)\)(.*)$')
         m = regex.match(token)
@@ -316,7 +314,7 @@ class ExecContext(object):
                 # if out:
                 #     sys.stderr.write('%s *> %s\n' % (cmd, out))
                 if err:
-                    sys.stderr.write('$(%s) => %s\n' % (cmd, err))
+                    self.root.loader.log('$(%s) => %s\n' % (cmd, err))
 
                 if proc.returncode != 0:
                     raise mvpipe.ParseError("Error running shell command: %s" % cmd)
@@ -480,14 +478,17 @@ class TargetContext(ExecContext):
             self.outputs_regex.append(re.compile(regex))
 
         # the target requires one of these groups of files...
-        # these are not evaluated now, but will need to be at run time (for output-based wildcard matching).
-        self.inputs = []
-        for ins in spl[1:]:
-            self.inputs.append([x.strip() for x in self.replace_token(ins).split()])
+        # these are not fully evaluated now, but will need to be at run time
+        # (for output-based wildcard matching).
+
+        self.inputs = [x.strip() for x in self.replace_token(spl[1]).split()]
 
         # print self.defline
         # print self.outputs
         # print self.inputs
+
+    def __repr__(self):
+        return self.defline
 
     def eval_line(self, line):
         if line and line[0] in [' ', '\t']:
@@ -509,13 +510,14 @@ class TargetContext(ExecContext):
         match_target = False
         for out, regex in zip(self.outputs, self.outputs_regex):
             if not target:
-                # print "MATCH (null)"
+                # self.rootctx.root.loader.log("MATCH (null) %s " % target)
                 match_target = True
                 wildcards.append('')
                 outputs.append(out)
             else:
                 m = regex.match(target)
                 if m:
+                    # self.rootctx.root.loader.log("MATCH (%s) %s" % (regex.pattern, target))
                     match_target = True
                     if m.groups():
                         wildcards.append(m.group(1))
@@ -523,16 +525,15 @@ class TargetContext(ExecContext):
                     else:
                         wildcards.append('')
                         outputs.append(out)
-                else:
-                    wildcards.append('')
-                    outputs.append(out)
+                # else:
+                    # self.rootctx.root.loader.log("NO MATCH (%s)" % regex.pattern)
 
         if match_target:
             return True, wildcards, outputs
         else:
             return False, None, None
 
-    def eval(self, outputs=None, inputs=None, numargs=None):
+    def eval_src(self, outputs=None, inputs=None, numargs=None):
         ctx = TargetExecContext(self._clonevals(), outputs, inputs, numargs, verbose=self.verbose)
         for line in self._body:
             ctx.parse_line(line)

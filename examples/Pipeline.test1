@@ -4,7 +4,7 @@
 ## global job settings (settings start with '#$')
 #$ job.cwd=T
 #$ job.env=T
-#$ fq1=foo.fastq
+##$ fq1=foo.fastq
 #$ fq2=bar.fastq
 #$ job.ppn=2
 
@@ -60,7 +60,7 @@
 # default job
 # ${fq1} is a required command-line arg
 # mvpipe -fq1 filename.fastq -f Pipeline
-all: test
+all: ${fq1}.gz
 
 #$ foo=foo
 
@@ -83,7 +83,7 @@ __post__:
 #$   done
 #$ done
 
-test: ${fq1}.gz ${fq2}.gz
+test: ${fq1}.gz ${fq2}.gz test.txt
     echo "testing ${fq1}"
 
 

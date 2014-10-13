@@ -18,6 +18,8 @@ def autotype(val):
 
             if val[0] == '"' and val[-1] == '"':
                 val = val[1:-1]
+            elif ' ' in val:
+                val = val.split()
             return val
 
 

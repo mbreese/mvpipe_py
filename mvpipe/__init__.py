@@ -4,26 +4,14 @@ import sys
 import context
 import support
 import logger
+import runner
+import config
 
-CONFIG_FILE=os.path.expanduser("~/.mvpiperc")
+def parse(fname, args, logfile=None, dryrun=False, verbose=False, **kwargs):
+    config_args = config.load_config(args)
+    runner_inst = config.get_runner(dryrun, verbose)
 
-def load_config(fname):
-    config = {}
-    if os.path.exists(fname):
-        with open(fname) as f:
-            for line in f:
-                if '=' in line:
-                    spl = [x.strip() for x in line.strip().split('=',1)]
-                    config[spl[0]] = support.autotype(spl[1])
-    return config
-
-
-def parse(fname, args, verbose=False, logfile=None, **kwargs):
-    config = load_config(CONFIG_FILE)
-    for k in args:
-        config[k] = args[k]
-
-    loader = PipelineLoader(config, verbose=verbose, **kwargs)
+    loader = PipelineLoader(config_args, runner_inst=runner_inst, verbose=verbose, **kwargs)
     if logfile:
         loader.set_log(logfile)
     loader.load_file(fname)
@@ -37,25 +25,35 @@ class ParseError(Exception):
 
 
 class PipelineLoader(object):
-    def __init__(self, args, verbose=False):
+    def __init__(self, args, runner_inst, verbose=False):
         self.context = context.RootContext(None, args, loader=self, verbose=verbose)
         self.verbose = verbose
         self.paths = []
         self.logger = None
+        self.output_jobs = {}
+        self.pending_jobs = {}
+        self.runner_inst = runner_inst
 
     def close(self):
+        self.runner_inst.done()
+        if self.logger:
+            self.logger.close()
+
+    def abort(self):
+        self.runner_inst.abort()
         if self.logger:
             self.logger.close()
 
     def set_log(self, fname):
         if self.logger:
-            self.logger.close()
-        
+            self.logger.close()        
         self.logger = logger.FileLogger(fname)
 
-    def log(self, msg):
+    def log(self, msg, stderr=False):
         if self.logger:
             self.logger.write(msg)
+            if stderr:
+                sys.stderr.write(msg)
         elif self.verbose:
             sys.stderr.write('%s\n' % msg)
 
@@ -102,8 +100,7 @@ class PipelineLoader(object):
                 try:
                     self.context.parse_line(line)
                 except ParseError, e:
-                    self.log('ERROR: %s\n[%s:%s] %s\n\n' % (e, fname, i+1, line))
-                    sys.stderr.write('ERROR: %s\n[%s:%s] %s\n\n' % (e, fname, i+1, line))
+                    self.log('ERROR: %s\n[%s:%s] %s\n\n' % (e, fname, i+1, line), True)
                     sys.exit(1)
 
             self.paths = self.paths[:-1]
@@ -112,286 +109,169 @@ class PipelineLoader(object):
             self.log(line)
 
 
-    def build(self, target, runner):
-        runner.reset()
-        self.log('Attempting to build target: %s' % (target if target else 'default'))
-        self.log('Job runner: %s' % runner.name)
+    def build(self, target):
+        self.log("***** STARTING BUILD *****")
+        self.runner_inst.reset()
+        self.missing = []
+        self.pending_jobs = {}
+
         pre = []
         post = []
 
         for tgt in self.context._targets:
             if '__pre__' in tgt.outputs:
-                pre = tgt.eval()
-
-        for tgt in self.context._targets:
+                pre = '\n'.join(tgt.eval_src())
             if '__post__' in tgt.outputs:
-                post = tgt.eval()
+                post = '\n'.join(tgt.eval_src())
+            if not target:
+                for out in tgt.outputs:
+                    if out not in ['__pre__', '__post__']:
+                        target = out
+                        break
 
-        valid, jobtree = self._build(target, pre, post, runner)
+        self.log('Attempting to build target: %s' % target)
+        self.log('Job runner: %s' % self.runner_inst.name)
+
+        self.log('[State]')
+        vals=self.context._clonevals()
+        for k in sorted(vals):
+            self.log('    %s => %s' % (k,vals[k]))
+
+        valid, lastjob = self._build(target, pre, post)
 
         if valid:
-            jobs = jobtree.prune(runner=runner)
+            if type(lastjob) == str:
+                return
+
+            joblist = lastjob.flatten()
             added = True
 
             submitted = set()
             while added:
                 added = False
-                for job in jobs:
+                for job in joblist:
                     if job in submitted:
                         continue
 
-                    passed = True
-                    for dep in job.depends:
-                        if dep not in submitted:
-                            passed = False
-                            break
-
-                    if passed:
-                        added = True
-                        jobid = runner.submit(job)
+                    if type(job) == str:
                         submitted.add(job)
+                        continue
 
-                        if jobid:
-                            job.jobid = jobid
-                            if jobid:
-                                self.log("Submitted job: %s %s" % (jobid, job.name))
-                                if job.outputs:
-                                    self.log("      outputs: %s" % ' '.join(job.outputs))
-                                if job.depends:
-                                    self.log("     requires: %s" % (','.join([x.jobid for x in job.depends if x.jobid])))
+                    added = True
+                    self.runner_inst.submit(job)
+                    submitted.add(job)
 
-                                
-                                for i, line in enumerate(job.pre.split('\n')):
-                                    if i == 0:
-                                        self.log("          pre: %s" % line)
-                                    else:
-                                        self.log("             : %s" % line)
-                                for i, line in enumerate(job.src.split('\n')):
-                                    if i == 0:
-                                        self.log("          src: %s" % line)
-                                    else:
-                                        self.log("             : %s" % line)
-                                for i, line in enumerate(job.post.split('\n')):
-                                    if i == 0:
-                                        self.log("         post: %s" % line)
-                                    else:
-                                        self.log("             : %s" % line)
+                    if job.jobid:
+                        self.log("Submitted job: %s %s" % (job.jobid, job.name))
+                        if job.outputs:
+                            self.log("      outputs: %s" % ' '.join(job.outputs))
+                        if job.depids:
+                            self.log("     requires: %s" % (','.join(job.depids)))
+
+                        
+                        for i, line in enumerate(job.pre.split('\n')):
+                            if i == 0:
+                                self.log("          pre: %s" % line)
+                            else:
+                                self.log("             : %s" % line)
+                        for i, line in enumerate(job.src.split('\n')):
+                            if i == 0:
+                                self.log("          src: %s" % line)
+                            else:
+                                self.log("             : %s" % line)
+                        for i, line in enumerate(job.post.split('\n')):
+                            if i == 0:
+                                self.log("         post: %s" % line)
+                            else:
+                                self.log("             : %s" % line)
+
+                        for out in job.outputs:
+                            self.output_jobs[out] = job.jobid
 
 
-            if len(submitted) != len(jobs):
-                sys.stderr.write("ERROR: Didn't submit as many jobs as we had in the build-graph!")
+            if len(submitted) != len(joblist):
+                self.log("WARNING: Didn't submit as many jobs as we had in the build-graph!", True)
 
         else:
-            sys.stderr.write("ERROR: Can't build target: %s\n" % (target if target else '*default*'))
-            if jobtree.lasterror._exception:
-                sys.stderr.write("%s\n" % jobtree.lasterror._exception)
+            if self.missing:
+                self.log("Missing files: %s\n" % ', '.join(self.missing), True)
+
+            raise ParseError("ERROR: Can't build target: %s\n" % target)
 
 
-    def _build(self, target, pre, post, runner):
+    def _build(self, target, pre, post, indent=0):
+        indentstr = ' ' * (indent * 4)
+        self.log('%sTrying to build file: %s' % (indentstr, target))
         if target:
             exists = support.target_exists(target)
-            if runner and runner.check_file_exists(target):
-                exists = True
-
             if exists:
+                self.log('%s    - %s exists' % (indentstr, target))
                 return True, None
+            
+            if target in self.output_jobs:
+                self.log('%s    - %s already set to be built' % (indentstr, target))
+                return True, self.output_jobs[target]
 
-        # TODO: Keep track of outputs and their jobs at the PipelineLoader level 
-        #       - this way you can build more than one target and not repeat dependencies...
+            exists, jobid = self.runner_inst.check_file_exists(target)
+            if exists:
+                self.log('%s   - %s already set to be built by existing job' % (indentstr, target))
+                return True, jobid
 
+        target_found = False
+        
         for tgt in self.context._targets:
             if '__pre__' in tgt.outputs or '__post__' in tgt.outputs:
                 continue
 
             match, numargs, outputs = tgt.match_target(target)
             if match:
-                good_inputgroup = False
-                jobdef = TargetJobDef(tgt, outputs, numargs, pre, post)
-                exception = None
+                target_found = True
+                good_input = True
+                depends = []
 
-                for inputgroup in tgt.inputs:
-                    good_inputgroup = False
-                    jobdef.reset()
+                self.log('%s    - found build definition: %s' % (indentstr, tgt))
 
-                    for inputstr in inputgroup:
-                        good_inputgroup = True
+                inputs = [tgt.replace_token(inputstr, numargs) for inputstr in tgt.inputs]
+                self.log('%s    - required inputs: %s' % (indentstr, inputs))
 
-                        try:
-                            inputs = tgt.replace_token(inputstr, numargs)
-                            if ' ' in inputs:
-                                inputs = inputs.split()
-                            else:
-                                inputs = [inputs,]
+                try:
+                    for inp in inputs:
+                        if inp in self.pending_jobs:
+                            self.log('%s    - %s pending' % (indentstr, inp))
+                            depends.append(self.pending_jobs[inp])
+                        else:
+                            isvalid, dep = self._build(inp, pre, post, indent+1)
 
-                            for next in inputs:
-                                jobdef.add_input(next)
+                            if not isvalid:
+                                good_input = False
+                                break
 
-                                exists = support.target_exists(next)
-                                if runner and runner.check_file_exists(next):
-                                    exists = True
+                            if dep:
+                                depends.append(dep)
 
-                                if not exists:
-                                    isvalid, dep = self._build(next, pre, post, runner)
-                                    if dep:
-                                        jobdef.add_dep(dep)
+                except Exception, e:
+                    self.log("%s    ***** Exception: %s" % (indentstr, str(e)))
+                    good_input = False
+                    break
 
-                                    if not isvalid:
-                                        good_inputgroup = False
-                                        exception = "Missing file: %s" % next
-                                        break
+                if good_input:
+                    src = '\n'.join(tgt.eval_src(outputs, inputs, numargs))
+                    kwargs = {}
+                    target_vals = tgt._clonevals()
+                    for k in target_vals:
+                        if k[:4] == 'job.':
+                            kwargs[k[4:]] = target_vals[k]
 
-                        except Exception, e:
-                            exception = e
-                            good_inputgroup = False
-                            break
+                    job = runner.Job(src, outputs, depends=depends, pre=pre, post=post, **kwargs)
 
-                    if good_inputgroup:
-                        break
+                    for out in outputs:
+                        self.pending_jobs[out] = job
 
-                if good_inputgroup:
-                    return True, jobdef
-                else:
-                    jobdef.seterror(exception)
-                    return False, jobdef
+                    return True, job
+
+                # look for an alternative target
+
+        if not target_found:
+            self.missing.append(target)
 
         return False, None
-
-
-class TargetJobDef(object):
-    def __init__(self, target, outputs, numargs, pre=None, post=None):
-        self.target = target
-        self.outputs = outputs
-        self.numargs = numargs
-        self._pre = pre
-        self._post = post
-
-        self.inputs = []
-        self.depends = []
-
-        self._error = False
-        self._exception = None
-
-        self._reset_count = 0
-        self._src = None
-        self.jobid = None
-
-        self._name = None
-
-    def reset(self):
-        self._reset_count += 1
-        self.inputs = []
-        self.depends = []
-
-    def add_input(self, inp):
-        self.inputs.append(inp)
-
-    def add_dep(self, child):
-        self.depends.append(child)
-
-    def __repr__(self):
-        return '<%s|%s>: (%s)' % (', '.join(self.outputs), self._reset_count, ', '.join(self.inputs))
-
-    @property
-    def name(self):
-        if not self._name:
-            if self.target.get('job.name'):
-                self._name = self.target.get('job.name')
-            else:
-                self._name = 'job'
-                for line in self.src.split('\n'):
-                    if line.strip() and line.strip()[0] != '#':
-                        self._name = line.strip().split(' ')[0]
-                        break
-        return self._name
-
-
-    @property
-    def error(self):
-        return self._error
-
-    @property
-    def lasterror(self):        
-        for c in self.depends:
-            if c.lasterror:
-                return c
-
-        if self._error:
-            return self
-
-        return None
-
-    def seterror(self, exception):
-        self._error = True
-        self._exception = exception
-
-    @property
-    def pre(self):
-        if self._pre:
-            return '\n'.join(self._pre)
-        return ''
-
-    @property
-    def post(self):
-        if self._post:
-            return '\n'.join(self._post)
-        return ''
-
-    @property
-    def src(self):
-        if not self._src:
-            src_lines = []
-
-            for line in self.target.eval(self.outputs, self.inputs, self.numargs):
-                src_lines.append(line)
-
-            if not src_lines:
-                return ''
-
-            self._src = '\n'.join(src_lines)
-        return self._src
-
-    def prune(self, jobs=None, outputs=None, runner=None):
-        if jobs is None:
-            jobs = []
-            outputs = {}
-
-        for out in self.outputs:
-            if not out in outputs:
-                jobs.append(self)
-                for o in self.outputs:
-                    outputs[o] = self
-                break
-
-        # TODO: Convert to return a simple definition of a Job: source code, dependent jobs (either object of jobid)
-        for dep in self.depends:
-            dep.prune(jobs, outputs)
-
-        self.depends = []
-
-        for inp in self.inputs:
-            if not support.target_exists(inp):
-                if not runner or not runner.check_file_exists(inp):
-                    if not outputs[inp] in self.depends:
-                        self.depends.append(outputs[inp])
-
-        return jobs
-
-    def _print(self, lines=None, i=0):
-        if not lines:
-            lines = []
-        
-        indent = ' ' * (i*2)
-        lines.append('%s%s' % (indent, self))
-
-        for c in self.depends:
-            c._print(lines, i+1)
-
-        return '\n'.join(lines)
-
-    def _dump(self):
-        # for dep in self.depends:
-        #     dep._dump()
-
-        sys.stderr.write('\n%s\n--------\n - (%s)\n - %s\n%s\n\n' % (self, ','.join([str(x) for x in self.depends]), self.target._values, self.src))
-
-

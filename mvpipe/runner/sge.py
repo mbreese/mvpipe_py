@@ -1,10 +1,14 @@
 import os
-from mvpipe.runner import Runner
+from mvpipe.runner import Runner, Job
 
 def_options = {'env': True, 'wd': os.path.abspath(os.curdir), 'mail': 'ea', 'hold': False}
 
 class SGERunner(Runner):
-    def __init__(self):
+    def __init__(self, dryrun, verbose, global_hold=False):
+        Runner.__init__(self, dryrun, verbose)
+        self.global_hold = global_hold
+        self.global_hold_jobid = None
+
         self.jobids = {}
 
     def reset(self):
@@ -14,9 +18,10 @@ class SGERunner(Runner):
         pass
 
     def holding(self):
-        return self.submit()
+        return self.submit(Job('sleep 5', hold=True))
 
     def submit(self, job):
+        src = ''
         if job.pre:
             src = job.pre
 
@@ -25,14 +30,6 @@ class SGERunner(Runner):
         if job.post:
             src = job.post
 
-        opts = job._clonevals()
-        jobopts = def_options
-        for k in opts:
-            if k[:4] == 'job.':
-                jobopts[k[4:]] = opts(k)
-
-
-        
-class SGEJob(object):
-    def __init__(self, **kwargs):
-        pass
+        jobopts = dict(def_options)
+        for k in job.args:
+            jobopts[k] = job.args[k]

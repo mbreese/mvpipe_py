@@ -2,7 +2,8 @@ import os
 from mvpipe.runner import Runner
 
 class BashRunner(Runner):
-    def __init__(self):
+    def __init__(self, dryrun, verbose, interpreter=None):
+        Runner.__init__(self, dryrun, verbose)
         self.funcs = []
         self.pre =  ''
         self.post = ''
@@ -10,35 +11,35 @@ class BashRunner(Runner):
         self.out = ''
 
         self._name = 'bash-script'
+        if interpreter:
+            self.interpreter = interpreter
+        else:
+            for intp in ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash']:
+                if os.path.exists(intp):
+                    self.interpreter = intp
+                    break
+            if not self.interpreter:
+                self.interpreter = '/bin/sh'
+
+    def set_interpreter(self, interpreter):
+        self.interpreter = interpreter
 
     def reset(self):
-        if self.pre:
-            self.out += '%s\n' % (self.pre)
         if self.body:
             self.out += '%s\n' % (self.body)
-        if self.post:
-            self.out += '%s\n' % (self.post)
 
-        self.pre =  ''
-        self.post = ''
         self.body = ''
 
     def done(self):
         self.reset()
-
-        if os.path.exists('/bin/bash'):
-            print '#!/bin/bash'
-        elif os.path.exists('/usr/bin/bash'):
-            print  '#!/usr/bin/bash'
-        elif os.path.exists('/usr/local/bin/bash'):
-            print  '#!/usr/local/bin/bash'
-        else:
-            print  '#!/bin/sh'
-
-        print self.out
-        print ""
-        for func in self.funcs:
-            print "%s" % func
+        if self.out:
+            print '#!%s' % self.interpreter
+            print self.out
+            print ""
+            print self.pre
+            for func in self.funcs:
+                print "%s" % func
+            print self.post
 
 
     def submit(self, job):
@@ -48,9 +49,9 @@ class BashRunner(Runner):
             self.post = job.post
 
         src = job.src
-
         if src:
             func = "job_%s" % (len(self.funcs) + 1)
             self.funcs.append(func)
             self.body+="%s() {\n%s\n}\n" % (func, src)
+            job.jobid = func
             return func

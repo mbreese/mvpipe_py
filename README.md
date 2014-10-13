@@ -28,7 +28,7 @@ complicated pipelines.
 
 ## Evaluated lines
 Any line that starts with `#$` will be evaluated as a MVpipe expression. All
-other lines will be processed for variable stubstitutions and either
+other lines will be processed for variable substitutions and either
 written to the log file, or included in the target script.
 
 ## Variables
@@ -47,10 +47,37 @@ Variables may also be set at the command-line like this: `mvpipe -foo bar -baz 1
 This is the same as saying:
 
     #$ foo = bar
-    #$ baz += 1
+    #$ baz = 1
     #$ baz += 2
 
-## If/Then
+## Variable substitution
+
+    ${var}          - Variable named "var". If "var" is a list, ${var} will
+                      be replaced with a space-separated string with all
+                      members of the list. If "var" hasn't been set, then this
+                      will throw a ParseError exception.
+
+    ${var?}         - Optional variable substitution. This is the same as
+                      above, except that if "var" hasn't been set, then it
+                      will be replaced with an empty string: ''.
+
+    foo_@{var}_bar  - A replacement list, capturing the surrounding context.
+                      For each member of list, the following will be returned:
+                      foo_one_bar, foo_two_bar, foo_three_bar, etc...
+
+    foo_@{n..m}_bar - A replacement range, capturing the surrounding context.
+                      For each member of range ({n} to {m}, the following will
+                      be returned: foo_1_bar, foo_2_bar, foo_3_bar, etc...
+
+                      {n} and {m} may be variables or integers
+
+### Shell escaping
+
+You may also include the results from shell commands as well using the syntax
+`$(command)`. Anything surrounded by `$()` will be executed in the current shell.
+Anything written to stdout can be captured as a variable. 
+
+## If/Else/Endif
 
 Basic syntax:
 
@@ -63,7 +90,7 @@ Basic syntax:
 If clauses can be nested as needed, but you can only specify one clause at a
 time (there is no concept of foo==1 and bar==2)
 
-### Clauses
+### Conditions
 
 `#$ if ${foo}` - if the variable ${foo} was set
 
@@ -74,7 +101,6 @@ time (there is no concept of foo==1 and bar==2)
 `#$ if ${foo} <= 1`    
 `#$ if ${foo} > 1`    
 `#$ if ${foo} >= 1`    
-
 
 ## For loops
 
@@ -88,33 +114,52 @@ Basic syntax:
        do something...
     #$ done
 
-## Target definitions
+## Build target definitions
 
-Targets are defined by...
+Targets are the files that you want to create. They are defined on a single
+line listing the outputs of the target, a colon (:), and any inputs that
+are needed to build the outputs.
 
-## Variable substitution
+Any text (indented) after the target definition will be included in the
+script used to build the outputs. The indentation for the first line will be
+removed from all subsequent lines, in case there is a need for indentation to
+be maintained. The indentation can be any number of tabs or spaces. The first
+(non-blank) line will end the target definition. MVpipe expressions can also
+be included in target definitions, but they need to be indented as well.
 
-    ${var}          - Variable named "var". If "var" is a list, ${var} will
-                      be replaced with a space-delimited string with all
-                      members of the list. If "var" hasn't been set, then this
-                      will throw a ParseError exception.
+MVpipe expressions can also be evaluated in the target definition. These
+will only be evaluated if the target needs to be built and can be used to 
+dynamically alter the build script. Any variables that are defined within the
+target can only be used within the target. Any global variables are captured
+at the point where the target is defined. Global variables may not altered
+within a target, but they can be reset within the context of the target
+itself.
 
-    ${var?}         - Optional variable substitution. This is the same as
-                      above, except that if "var" hasn't been set, then it will
-                      be replaced with an empy string: ''.
+Example:
 
-    foo_@{var}_bar  - An replacement list, capturing the surrounding context.
-                      For each member of list, the following will be returned:
-                      foo_one_bar, foo_two_bar, foo_three_bar, etc...
+    output1.txt.gz output2.txt.gz : input1.txt input2.txt
+        gzip -c input1.txt > output1.txt.gz
+        gzip -c input2.txt > output2.txt.gz
 
-    foo_@{n..m}_bar - An replacement range, capturing the surrounding context.
-                      For each member of range ({n} to {m}, the following will
-                      be returned: foo_1_bar, foo_2_bar, foo_3_bar, etc...
 
-                      {n} and {m} may be variables or integers
+You may also have more than one target definition for any given output
+file(s). In the event that there is more than one way to build an ouput,
+the first listed build definition will be tried first. If the needed inputs
+(or dependencies) aren't available for the first definition, then the next
+will be tried until all methods are exhausted.
 
-## Target substitutions
-In addition to global variable substitutions, within a target, these
+In the event that a complete build tree can't be found, a ParseError will be
+thrown.
+
+### Wildcards in targets
+
+Using wildcards, the above could also be rewritten like this:
+
+    %.gz: $1
+        gzip -c $< > $>
+
+### Target substitutions
+In addition to global variable substitutions, within a target these
 additional substitutions are available. Targets may also have their own
 local variables.
 
@@ -127,11 +172,9 @@ defined.
     $<              - The list of all inputs
     $<num           - The {num}'th input (starts at 1)
 
-    $?              - The input-group selected (if there are more than one)
-
     $num            - If a wildcard was matched for the target-name (%.txt,
                       for example), the wildcard for output {num}. (Each
-                      output target filename can have at most one wildcard).
+                      output filename can have at most one wildcard).
 
 ## Including other files
 Other Pileline files can be imported into the currently running Pipeline by
@@ -153,4 +196,8 @@ command-line argument.
 Comments are started with two `##` characters. If a line starts with only one
 `#`, then it will be evaluated and outputed to the log file (if one exists) or
 the script body for the target.
+
+You may also include the '$' and '@' characters in expressions or evaluated
+lines by escaping them with a '\' character before them, such as `\$`.
+
 
