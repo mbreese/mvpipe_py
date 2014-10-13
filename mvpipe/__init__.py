@@ -120,14 +120,14 @@ class PipelineLoader(object):
                 cmd = tgt.eval_src()
                 self.log("[setup]")
                 for line in cmd:
-                    if line and line.strip():
                         self.log("setup: %s" % line.strip())
-                        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                        out, err = proc.communicate()
-                        if out:
-                            self.log("     : %s" % out)
-                        if err:
-                            self.log("     : %s" % err, True)
+
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                out, err = proc.communicate()
+                if out:
+                    self.log("     : %s" % out)
+                if err:
+                    self.log("     : %s" % err, True)
 
 
     def teardown(self):
@@ -138,12 +138,13 @@ class PipelineLoader(object):
                 for line in cmd:
                     if line and line.strip():
                         self.log("teardown: %s" % line.strip())
-                        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                        out, err = proc.communicate()
-                        if out:
-                            self.log("     : %s" % out)
-                        if err:
-                            self.log("     : %s" % err, True)
+
+                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                out, err = proc.communicate()
+                if out:
+                    self.log("     : %s" % out)
+                if err:
+                    self.log("     : %s" % err, True)
 
 
 
@@ -167,7 +168,7 @@ class PipelineLoader(object):
                 post = '\n'.join(tgt.eval_src())
             if not target:
                 for out in tgt.outputs:
-                    if out not in ['__pre__', '__post__']:
+                    if out not in ['__pre__', '__post__', '__setup__', '__teardown__']:
                         target = out
                         break
 
@@ -244,6 +245,10 @@ class PipelineLoader(object):
     def _build(self, target, pre, post, indent=0):
         indentstr = ' ' * (indent * 4)
         self.log('%sTrying to build file: %s' % (indentstr, target))
+
+        if self.verbose:
+            sys.stderr.write('Target: %s\n' % target)
+
         if target:
             exists = support.target_exists(target)
             if exists:

@@ -276,11 +276,12 @@ class ExecContext(object):
                     if 0 <= mi and mi < len(self._var_inputs):
                         # print "var found => %s" % m.group(2)
                         token = '%s%s%s' % (m.group(1), self._var_inputs[mi], m.group(3))
-                        m = regex.match(token)
                     else:
                         raise mvpipe.ParseError("Unknown input-num: $<%s" % m.group(2))
                 else:
                     token = '%s%s%s' % (m.group(1), ' '.join(self._var_inputs), m.group(3))
+
+                m = regex.match(token)
 
         # outputs-replace
         if self._var_outputs:
@@ -297,7 +298,7 @@ class ExecContext(object):
                         raise mvpipe.ParseError("Unknown output-num: $>%s" % m.group(2))
                 else:
                     token = '%s%s%s' % (m.group(1), ' '.join(self._var_outputs), m.group(3))
-
+                
                 m = regex.match(token)
 
         # shell-out
@@ -333,6 +334,8 @@ class ExecContext(object):
         if line[:2] != '#$':
             if line[0] not in ['#',' ','\t'] and ':' in line:
                 self.child = TargetContext(self, line)
+                if not self.active:
+                    self.child.badtarget=True
                 self.root._targets.append(self.child)
                 return True
 
@@ -467,11 +470,15 @@ class TargetContext(ExecContext):
         self.defline = defline
         self._leading_whitespace = ''
         self.out = []
+        self.badtarget = False
 
         spl = defline.split(':')
 
         # the target will output these files
-        self.outputs = self.replace_token(spl[0].strip()).split()
+        try:
+            self.outputs = self.replace_token(spl[0].strip()).split()
+        except:
+            self.badtarget = True
         self.outputs_regex = []
 
         for out in self.outputs:
@@ -489,7 +496,10 @@ class TargetContext(ExecContext):
         # these are not fully evaluated now, but will need to be at run time
         # (for output-based wildcard matching).
 
-        self.inputs = [x.strip() for x in self.replace_token(spl[1]).split()]
+        try:
+            self.inputs = [x.strip() for x in self.replace_token(spl[1]).split()]
+        except:
+            self.badtarget = True
 
         # print self.defline
         # print self.outputs
@@ -513,6 +523,9 @@ class TargetContext(ExecContext):
             return True
 
     def match_target(self, target):
+        if self.badtarget:
+            return False, None, None
+
         wildcards = []
         outputs = []
         match_target = False

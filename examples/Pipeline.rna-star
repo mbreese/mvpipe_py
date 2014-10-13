@@ -1,4 +1,4 @@
-#$ log "log.txt"
+#$ log "rnaseq.log"
 
 #$ if !${ref}
 #$ ref=/srv/gsfs0/projects/cho/riboseq/star-index
@@ -30,10 +30,12 @@ __post__:
 __setup__:
     mkdir -p mapping/${base}
     #$ if ${fq1}
-    ln -s ${fq1} mapping/${base}
-    ln -s ${fq2} mapping/${base}
+    ln -s "${fq1}" mapping/${base}
+    ln -s "${fq2}" mapping/${base}
     #$ else 
-    ln -s ${fq} mapping/${base}
+    if [ ! -e mapping/${base}/\$(basename ${fq})]; then
+    ln -s "${fq}" mapping/${base}
+    fi
     #$ endif
 
 
@@ -45,7 +47,7 @@ all: mapping/${base}/${base}.${org}.bam.stats.txt
 
 
 
-%.merged.fastq.gz: ${fq1?} ${fq2?}
+%.merged.fastq.gz: ${fq1} ${fq2}
     ngsutilsj fastq-merge ${fq1} ${fq2} | gzip > ${base}.fastq.gz
 
 %.filtered.fastq.gz: ${1}.merged.fastq.gz
@@ -88,6 +90,6 @@ all: mapping/${base}/${base}.${org}.bam.stats.txt
         $< > .$>.tmp && mv .$>.tmp $>
 
 #$ if ${gtf}
-%.counts.txt: ${1}.bam ${1}.bam.bai ${gtf}
+%.counts.txt: ${1}.bam ${1}.bam.bai
     bamutils count -gtf ${gtf} -library ${library_type} $<1 > $>1
 #$ endif
