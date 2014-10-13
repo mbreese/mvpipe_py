@@ -5,7 +5,10 @@ import datetime
 class FileLogger(object):
     def __init__(self, fname):
         self.fname = fname
-        self.fobj = open(fname, 'a')
+        if fname:
+            self.fobj = open(fname, 'a')
+        else:
+            self.fobj = None
 
         self.sep()
         self.write("New run: %s" % datetime.datetime.now())
@@ -13,10 +16,18 @@ class FileLogger(object):
         self.write("Current directory: %s" % os.getcwd())
 
     def close(self):
-        self.fobj.close()
+        if self.fobj:
+            self.fobj.close()
 
     def write(self, line):
-        self.fobj.write('%s\n' % line)
+        if self.fobj:
+            self.fobj.write('%s\n' % line)
 
     def sep(self):
             self.write('----------------------------------------')
+
+    def set_fname(self, fname):
+        if self.fobj:
+            self.fobj.close()
+        self.fobj = open(fname, 'a')
+        self.fname = fname

@@ -32,7 +32,7 @@ class Job(object):
         for d in self._depends:
             if type(d) == str:
                 depids.append(d)
-            else:
+            elif d.jobid:
                 depids.append(d.jobid)
 
         return depids
@@ -64,11 +64,17 @@ class Job(object):
 
 
 class Runner(object):
-    def __init__(self, dryrun, verbose):
+    def __init__(self, dryrun, verbose, logger=None):
         self.dryrun = dryrun
         self.verbose = verbose
-        
+        self.logger = logger
+        self._name = None
+
+        # self._output_jobs = {}
+
     def check_file_exists(self, fname):
+        # if fname in self._output_jobs:
+        #     return True, self._output_jobs[fname]
         return False, None
 
     def reset(self):
@@ -76,6 +82,15 @@ class Runner(object):
 
     def abort(self):
         pass
+
+    def log(self, msg, tostderr=False):
+        if self.logger:
+            self.logger.write('%s' % msg)
+            if tostderr:
+                sys.stderr.write('%s\n' % msg)
+        else:
+            sys.stderr.write('%s\n' % msg)
+
 
     @property
     def name(self):

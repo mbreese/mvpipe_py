@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 
 import context
 import support
@@ -9,11 +10,11 @@ import config
 
 def parse(fname, args, logfile=None, dryrun=False, verbose=False, **kwargs):
     config_args = config.load_config(args)
-    runner_inst = config.get_runner(dryrun, verbose)
+    log_inst = logger.FileLogger(logfile)
 
-    loader = PipelineLoader(config_args, runner_inst=runner_inst, verbose=verbose, **kwargs)
-    if logfile:
-        loader.set_log(logfile)
+    runner_inst = config.get_runner(dryrun, verbose, log_inst)
+
+    loader = PipelineLoader(config_args, runner_inst=runner_inst, logger=log_inst, verbose=verbose, **kwargs)
     loader.load_file(fname)
     return loader
 
@@ -25,17 +26,21 @@ class ParseError(Exception):
 
 
 class PipelineLoader(object):
-    def __init__(self, args, runner_inst, verbose=False):
+    def __init__(self, args, runner_inst, logger=None, verbose=False):
         self.context = context.RootContext(None, args, loader=self, verbose=verbose)
         self.verbose = verbose
         self.paths = []
-        self.logger = None
+        self.logger = logger
         self.output_jobs = {}
         self.pending_jobs = {}
         self.runner_inst = runner_inst
+        self.is_setup = False
 
     def close(self):
         self.runner_inst.done()
+        if self.is_setup:
+            self.teardown()
+
         if self.logger:
             self.logger.close()
 
@@ -46,8 +51,7 @@ class PipelineLoader(object):
 
     def set_log(self, fname):
         if self.logger:
-            self.logger.close()        
-        self.logger = logger.FileLogger(fname)
+            self.logger.set_fname(fname)
 
     def log(self, msg, stderr=False):
         if self.logger:
@@ -109,7 +113,45 @@ class PipelineLoader(object):
             self.log(line)
 
 
+    def setup(self):
+        self.is_setup = True
+        for tgt in self.context._targets:
+            if '__setup__' in tgt.outputs:
+                cmd = tgt.eval_src()
+                self.log("[setup]")
+                for line in cmd:
+                    if line and line.strip():
+                        self.log("setup: %s" % line.strip())
+                        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                        out, err = proc.communicate()
+                        if out:
+                            self.log("     : %s" % out)
+                        if err:
+                            self.log("     : %s" % err, True)
+
+
+    def teardown(self):
+        for tgt in self.context._targets:
+            if '__teardown__' in tgt.outputs:
+                cmd = tgt.eval_src()
+                self.log("[teardown]")
+                for line in cmd:
+                    if line and line.strip():
+                        self.log("teardown: %s" % line.strip())
+                        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                        out, err = proc.communicate()
+                        if out:
+                            self.log("     : %s" % out)
+                        if err:
+                            self.log("     : %s" % err, True)
+
+
+
+
     def build(self, target):
+        if not self.is_setup:
+            self.setup()
+
         self.log("***** STARTING BUILD *****")
         self.runner_inst.reset()
         self.missing = []
@@ -205,16 +247,16 @@ class PipelineLoader(object):
         if target:
             exists = support.target_exists(target)
             if exists:
-                self.log('%s    - %s exists' % (indentstr, target))
+                self.log('%s  - %s exists' % (indentstr, target))
                 return True, None
             
             if target in self.output_jobs:
-                self.log('%s    - %s already set to be built' % (indentstr, target))
+                self.log('%s  - %s already set to be built (%s)' % (indentstr, target, self.output_jobs[target]))
                 return True, self.output_jobs[target]
 
             exists, jobid = self.runner_inst.check_file_exists(target)
             if exists:
-                self.log('%s   - %s already set to be built by existing job' % (indentstr, target))
+                self.log('%s - %s already set to be built by existing job' % (indentstr, target))
                 return True, jobid
 
         target_found = False
@@ -229,15 +271,15 @@ class PipelineLoader(object):
                 good_input = True
                 depends = []
 
-                self.log('%s    - found build definition: %s' % (indentstr, tgt))
+                self.log('%s  - found build definition: %s' % (indentstr, tgt))
 
                 inputs = [tgt.replace_token(inputstr, numargs) for inputstr in tgt.inputs]
-                self.log('%s    - required inputs: %s' % (indentstr, inputs))
+                self.log('%s  - required inputs: %s' % (indentstr, inputs))
 
                 try:
                     for inp in inputs:
                         if inp in self.pending_jobs:
-                            self.log('%s    - %s pending' % (indentstr, inp))
+                            self.log('%s  - %s pending' % (indentstr, inp))
                             depends.append(self.pending_jobs[inp])
                         else:
                             isvalid, dep = self._build(inp, pre, post, indent+1)
@@ -250,7 +292,7 @@ class PipelineLoader(object):
                                 depends.append(dep)
 
                 except Exception, e:
-                    self.log("%s    ***** Exception: %s" % (indentstr, str(e)))
+                    self.log("%s  ***** Exception: %s" % (indentstr, str(e)))
                     good_input = False
                     break
 
@@ -263,6 +305,9 @@ class PipelineLoader(object):
                             kwargs[k[4:]] = target_vals[k]
 
                     job = runner.Job(src, outputs, depends=depends, pre=pre, post=post, **kwargs)
+
+                    self.log('%s  * submitting job' % (indentstr, ))
+
 
                     for out in outputs:
                         self.pending_jobs[out] = job

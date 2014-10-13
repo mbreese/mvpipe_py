@@ -86,10 +86,10 @@ if __name__ == '__main__':
 
     pipe = mvpipe.parse(fname, args, logfile=logfile, dryrun=dryrun, verbose=verbose)
 
-    try:
-        for t in target:
+    # try:
+    for t in target:
             pipe.build(t)
-        pipe.close()
-    except Exception, e:
-        pipe.abort()
-        sys.stderr.write('%s\n' % e)
+    pipe.close()
+    # except Exception, e:
+    #     pipe.abort()
+    #     sys.stderr.write('%s\n' % e)

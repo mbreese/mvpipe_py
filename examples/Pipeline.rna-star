@@ -1,74 +1,93 @@
+#$ log "log.txt"
+
 #$ if !${ref}
 #$ ref=/srv/gsfs0/projects/cho/riboseq/star-index
 #$ endif
-#$ if ${fq1}
-#$ base=$(echo "${fq1}" | sed -e 's/.gz$//' | sed -e 's/.fastq//')
-#$ else
-#$ base=$(echo "${fq}" | sed -e 's/.bam$//')
-#$ endif
-#$ gtf=/srv/gsfs0/projects/cho/references/ensembl.74.hg19.gtf.gz
-#$ library_type=RF
 
-#$ cwd
-#$ env
+#$ if !${org}
+#$ org = hg19
+#$ endif
+
+#$ if ${fq1}
+#$ base=$(basename "${fq1}" | sed -e 's/.gz$//' | sed -e 's/.fastq//')
+#$ else
+#$ base=$(basename "${fq}" | sed -e 's/.bam$//')
+#$ endif
+
+#$ if !${gtf}
+#$ gtf=/srv/gsfs0/projects/cho/references/ensembl.74.hg19.gtf.gz
+#$ endif
+
+#$ library_type=RF
 #$ job.procs=1
 
 __pre__:
     module add ngs-bundle/1
-    echo ${job.procs}
 
 __post__:
     # pass
 
-#$ $(echo "for-loop start")
-#$ for i in 1..${num}
-#$ $(echo "for-loop: ${i}")
-#$ done
-#$ $(echo "for-loop done")
+__setup__:
+    mkdir -p mapping/${base}
+    #$ if ${fq1}
+    ln -s ${fq1} mapping/${base}
+    ln -s ${fq2} mapping/${base}
+    #$ else 
+    ln -s ${fq} mapping/${base}
+    #$ endif
 
 
 #$ if ${gtf}
-all: ${base}.${org}.counts.txt ${base}.${org}.bam.stats.txt
+all: mapping/${base}/${base}.${org}.counts.txt mapping/${base}/${base}.${org}.bam.stats.txt
 #$ else
-all: ${base}.${org}.bam.stats.txt
+all: mapping/${base}/${base}.${org}.bam.stats.txt
 #$ endif
 
 
-${base}.fastq.gz: ${fq1} ${fq2}
+
+%.merged.fastq.gz: ${fq1?} ${fq2?}
     ngsutilsj fastq-merge ${fq1} ${fq2} | gzip > ${base}.fastq.gz
 
-*.filtered.fastq.gz: ${1}.fastq.gz : ${1}.bam
-    ngsutilsj fastq-filter --wildcard 2 --size 50 --suffixqual '\#' --paired $<1 | gzip > ${base}.filtered.fastq.gz
+%.filtered.fastq.gz: ${1}.merged.fastq.gz
+    ngsutilsj fastq-filter --wildcard 2 --size 50 --suffixqual '\#' --paired $< | gzip > $>
 
-*_fastqc.zip: ${1}.fastq.gz
+%.filtered.fastq.gz: ${1}.bam
+    ngsutilsj fastq-filter --wildcard 2 --size 50 --suffixqual '\#' --paired $< | gzip > $>
+
+%_fastqc.zip: ${1}.fastq.gz
     fastqc --noextract $<1
 
-#*.gz: ${1}
-#    gzip $<1
+%.fastq.stats.txt: ${1}.fastq
+    fastqutils stats $< > .$>.tmp && mv .$>.tmp $>
 
-*.fastq.stats.txt: ${1}.fastq
-    fastqutils stats $<1 > .$>1.tmp && mv .$>1.tmp $>1
+%.fastq.stats.txt: ${1}.fastq.gz
+    fastqutils stats $< > .$>.tmp && mv .$>.tmp $>
 
-*.fastq.stats.txt: ${1}.fastq.gz
-    fastqutils stats $<1 > .$>1.tmp && mv .$>1.tmp $>1
+#$ if ${seqfilter}
+%.seqfiltered.fastq.gz: ${1}.filtered.fastq.gz
+    bwa mem -M -t 2 ${seqfilter} $< | samtools view -bS - > ${1}.seqfilter.bam
+    ngsutilsj fastq-filter --paired ${1}.seqfilter.bam | gzip > $>
+#$ endif
 
-*.${org}.bam: ${1}.filtered.fastq.gz
+%.${org}.bam: ${1}.seqfiltered.fastq.gz
     #$ job.procs=8
-    echo ${job.procs}
     STAR --genomeDir ${ref} --readFilesIn $<1 --readFilesCommand zcat --runThreadN 8 --outFileNamePrefix %s/ --outSAMunmapped Within --outStd SAM  --outFilterIntronMotifs RemoveNoncanonical | samtools view -Sbu - | samtools sort - .$>1.tmp && mv .$>1.tmp.bam $>1
 
-*.bam.bai extra: ${1}.bam
-    samtools index $<1
-    touch extra
+%.${org}.bam: ${1}.filtered.fastq.gz
+    #$ job.procs=8
+    STAR --genomeDir ${ref} --readFilesIn $<1 --readFilesCommand zcat --runThreadN 8 --outFileNamePrefix %s/ --outSAMunmapped Within --outStd SAM  --outFilterIntronMotifs RemoveNoncanonical | samtools view -Sbu - | samtools sort - .$>1.tmp && mv .$>1.tmp.bam $>1
 
-*.bam.stats.txt: ${1}.bam
+%.bam.bai: ${1}.bam
+    samtools index $<1
+
+%.bam.stats.txt: ${1}.bam
     bamutils stats \
     #$if ${gtf}
         -gtf ${gtf} \
     #$endif
-        $<1 > .$>1.tmp && mv .$>1.tmp $>1
+        $< > .$>.tmp && mv .$>.tmp $>
 
 #$ if ${gtf}
-*.counts.txt: ${1}.bam ${1}.bam.bai ${gtf}
+%.counts.txt: ${1}.bam ${1}.bam.bai ${gtf}
     bamutils count -gtf ${gtf} -library ${library_type} $<1 > $>1
 #$ endif

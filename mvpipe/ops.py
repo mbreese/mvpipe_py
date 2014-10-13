@@ -67,7 +67,7 @@ def unsetop(context, line):
 
 regex_if = re.compile('^if[ \t]+(\$\{[^ \t]+\??\})[ \t]*([=<>!]+)[ \t]*(.*)$')
 regex_ifset = re.compile('^if[ \t]+(\$\{[^ \t]+\??\})$')
-regex_ifnot = re.compile('^if[ \t]+\![ \t]+(\$\{[^ \t]+\??\})$')
+regex_ifnot = re.compile('^if[ \t]+\![ \t]*(\$\{[^ \t]+\??\})$')
 
 def ifop(context, line):
     m = regex_if.match(line)
@@ -98,7 +98,7 @@ def ifop(context, line):
 
     m = regex_ifset.match(line)
     if m:
-        l = autotype(context.replace_token(m.group(1)))
+        l = autotype(context.replace_token(m.group(1), allow_missing=True))
         test = False
         if l:
             test = True
@@ -108,7 +108,7 @@ def ifop(context, line):
 
     m = regex_ifnot.match(line)
     if m:
-        l = autotype(context.replace_token(m.group(1)))
+        l = autotype(context.replace_token(m.group(1), allow_missing=True))
         test = True
         if l:
             test = False

@@ -3,6 +3,7 @@ import support
 import runner
 import runner.bash
 import runner.sge
+import socket
 
 CONFIG_FILE=os.path.expanduser("~/.mvpiperc")
 
@@ -10,6 +11,7 @@ _config = None
 
 _defconfig = {
     'mvpipe.runner': 'bash',
+    'mvpipe.host': socket.gethostname()
 }
 
 
@@ -48,12 +50,12 @@ def _config_prefix(prefix):
     return out
 
 
-def get_runner(dryrun=False, verbose=False):
+def get_runner(dryrun=False, verbose=False, logger=None):
     if _config['mvpipe.runner'] == 'sge':
-        return runner.sge.SGERunner(dryrun=dryrun, verbose=verbose, **_config_prefix('mvpipe.runner.bash.'))
+        return runner.sge.SGERunner(dryrun=dryrun, verbose=verbose, logger=logger, **_config_prefix('mvpipe.runner.sge.'))
 
     if _config['mvpipe.runner'] == 'bash':
-        return runner.bash.BashRunner(dryrun=dryrun, verbose=verbose, **_config_prefix('mvpipe.runner.bash.'))
+        return runner.bash.BashRunner(dryrun=dryrun, verbose=verbose, logger=logger, **_config_prefix('mvpipe.runner.bash.'))
 
     return runner.get_runner()
 

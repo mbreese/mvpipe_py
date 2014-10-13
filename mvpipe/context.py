@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import sys
 
 import ops
 import mvpipe
@@ -129,7 +130,7 @@ class ExecContext(object):
         if not self.eval_line(line):
             raise mvpipe.ParseError("Don't know how to parse line")
 
-    def replace_token(self, token, numargs=None):
+    def replace_token(self, token, numargs=None, allow_missing=False):
         if not token:
             return ''
         
@@ -148,7 +149,6 @@ class ExecContext(object):
             if m.group(2):
                 # print "var found => %s" % m.group(2)
 
-                allow_missing = False
                 if m.group(2)[-1] == '?':
                     k = m.group(2)[:-1]
                     allow_missing = True
@@ -376,6 +376,9 @@ class IfContext(ExecContext):
         ExecContext.__init__(self, parent)
         self.test = test
 
+    def set(self, k, v):
+        self.parent.set(k,v)
+
     def eval_line(self, line):
         if line[:2] == '#$':
             for op in [ops.elseop, ops.endifop]:
@@ -389,6 +392,8 @@ class ElseContext(ExecContext):
         ExecContext.__init__(self, parent.parent)
         self.test = not parent.test
 
+    def set(self, k, v):
+        self.parent.set(k,v)
 
     def eval_line(self, line):
         if line[:2] == '#$':
@@ -406,6 +411,9 @@ class ForContext(ExecContext):
         self.varlist = varlist
         self._body = []
         self.loop_count = 0
+
+    def set(self, k, v):
+        self.parent.set(k,v)
 
     def eval_line(self, line):
         if line[:2] == '#$':

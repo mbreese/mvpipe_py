@@ -2,8 +2,8 @@ import os
 from mvpipe.runner import Runner
 
 class BashRunner(Runner):
-    def __init__(self, dryrun, verbose, interpreter=None):
-        Runner.__init__(self, dryrun, verbose)
+    def __init__(self, dryrun, verbose, logger, interpreter=None):
+        Runner.__init__(self, dryrun, verbose, logger)
         self.funcs = []
         self.pre =  ''
         self.post = ''
@@ -49,9 +49,13 @@ class BashRunner(Runner):
             self.post = job.post
 
         src = job.src
+
         if src:
             func = "job_%s" % (len(self.funcs) + 1)
             self.funcs.append(func)
             self.body+="%s() {\n%s\n}\n" % (func, src)
             job.jobid = func
-            return func
+
+            # for out in job.outputs:
+            #     self._output_jobs[out] = func
+
