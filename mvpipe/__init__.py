@@ -193,6 +193,11 @@ class PipelineLoader(object):
             if type(lastjob) == str:
                 return
 
+            if not lastjob:
+                # nothing to do...
+                sys.stderr.write('Nothing to do...')
+                self.log('Nothing to do...')
+                return
             joblist = lastjob.flatten()
             added = True
 
