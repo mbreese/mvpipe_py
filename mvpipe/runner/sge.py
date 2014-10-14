@@ -28,7 +28,7 @@ class SGERunner(Runner):
         pass
 
     def _setup_holding_job(self):
-        holding_job = Job('sleep 5', hold=True)
+        holding_job = Job('sleep 5', name="holding", hold=True)
         self.submit(holding_job)
         self.global_hold_jobid = holding_job.jobid
         self.global_depends.append(holding_job.jobid)
