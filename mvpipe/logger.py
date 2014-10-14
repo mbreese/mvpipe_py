@@ -31,3 +31,7 @@ class FileLogger(object):
             self.fobj.close()
         self.fobj = open(fname, 'a')
         self.fname = fname
+        self.sep()
+        self.write("New run: %s" % datetime.datetime.now())
+        self.write("Command line: %s" % ' '.join(sys.argv))
+        self.write("Current directory: %s" % os.getcwd())
