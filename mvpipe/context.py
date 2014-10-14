@@ -128,7 +128,7 @@ class ExecContext(object):
             return self.child.parse_line(line)
 
         if not self.eval_line(line):
-            raise mvpipe.ParseError("Don't know how to parse line")
+            raise mvpipe.ParseError("Don't know how to parse line: %s" % line)
 
     def replace_token(self, token, numargs=None, allow_missing=False):
         if not token:
