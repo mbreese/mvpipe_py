@@ -8,12 +8,13 @@ from mvpipe.runner import Runner, Job
 def_options = {'env': True, 'wd': os.path.abspath(os.curdir), 'mail': 'ea', 'hold': False}
 
 class SGERunner(Runner):
-    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None):
+    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, parallelenv='shm'):
         Runner.__init__(self, dryrun, verbose, logger)
         self.global_hold = global_hold
         self.global_hold_jobid = None
-        self.global_depends = global_depends
+        self.global_depends = global_depends if global_depends else []
         self.account = account
+        self.parallelenv = parallelenv
 
         self.jobids = {}
 
@@ -26,14 +27,18 @@ class SGERunner(Runner):
     def done(self):
         pass
 
-    def holding(self):
+    def _setup_holding_job(self):
         holding_job = Job('sleep 5', hold=True)
         self.submit(holding_job)
         self.global_hold_jobid = holding_job.jobid
+        self.global_depends.append(holding_job.jobid)
 
     def submit(self, job):
         if not job.src:
             return
+
+        if self.global_host and not self.global_hold_jobid:
+            self._setup_holding_job()
 
         body = ''
 

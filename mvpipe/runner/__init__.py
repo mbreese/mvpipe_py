@@ -38,6 +38,9 @@ class Job(object):
         return depids
 
 
+    def __repr__(self):
+        return '<job: %s>' % ','.join(self.outputs)
+
     def add_dep(self, dep):
         self._depends.add(dep)
 
@@ -46,19 +49,20 @@ class Job(object):
             dep._dump(i+1)
 
         indent = ' ' * (i * 4)
-        sys.stderr.write('%s%s\n' % (indent, '\,'.join(self.outputs)))
+        sys.stderr.write('%s%s\n' % (indent, self))
 
     def flatten(self, l=None):
         if l is None:
-            l = set()
+            l = []
         
         for d in self._depends:
             if type(d) == str:
-                l.add(d)
+                l.append(d)
             else:
                 d.flatten(l)
 
-        l.add(self)
+        if self not in l:
+            l.append(self)
 
         return l
 

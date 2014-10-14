@@ -14,7 +14,7 @@ def parse(fname, args, logfile=None, dryrun=False, verbose=False, **kwargs):
 
     runner_inst = config.get_runner(dryrun, verbose, log_inst)
 
-    loader = PipelineLoader(config_args, runner_inst=runner_inst, logger=log_inst, verbose=verbose, **kwargs)
+    loader = PipelineLoader(config_args, runner_inst=runner_inst, logger=log_inst, dryrun=dryrun, verbose=verbose, **kwargs)
     loader.load_file(fname)
     return loader
 
@@ -26,9 +26,10 @@ class ParseError(Exception):
 
 
 class PipelineLoader(object):
-    def __init__(self, args, runner_inst, logger=None, verbose=False):
+    def __init__(self, args, runner_inst, logger=None, dryrun=False, verbose=False):
         self.context = context.RootContext(None, args, loader=self, verbose=verbose)
         self.verbose = verbose
+        self.dryrun = dryrun
         self.paths = []
         self.logger = logger
         self.output_jobs = {}
@@ -121,6 +122,9 @@ class PipelineLoader(object):
                 self.log("[setup]")
                 for line in cmd:
                         self.log("setup: %s" % line.strip())
+                
+                if self.dryrun:
+                    return
 
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 out, err = proc.communicate()
@@ -138,6 +142,9 @@ class PipelineLoader(object):
                 for line in cmd:
                     if line and line.strip():
                         self.log("teardown: %s" % line.strip())
+
+                if self.dryrun:
+                    return
 
                 proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 out, err = proc.communicate()
@@ -246,8 +253,8 @@ class PipelineLoader(object):
         indentstr = ' ' * (indent * 4)
         self.log('%sTrying to build file: %s' % (indentstr, target))
 
-        if self.verbose:
-            sys.stderr.write('Target: %s\n' % target)
+#        if self.verbose:
+#            sys.stderr.write('Target: %s\n' % target)
 
         if target:
             exists = support.target_exists(target)
