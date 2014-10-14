@@ -309,9 +309,10 @@ class PipelineLoader(object):
                     break
 
                 if good_input:
-                    src = '\n'.join(tgt.eval_src(outputs, inputs, numargs))
+                    tcxt = tgt.eval_src(outputs, inputs, numargs)
+                    src = '\n'.join(tcxt.out)
                     kwargs = {}
-                    target_vals = tgt._clonevals()
+                    target_vals = tcxt._clonevals()
                     for k in target_vals:
                         if k[:4] == 'job.':
                             kwargs[k[4:]] = target_vals[k]
