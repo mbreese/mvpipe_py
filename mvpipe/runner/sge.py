@@ -30,7 +30,7 @@ class SGERunner(Runner):
         pass
 
     def _setup_holding_job(self):
-        self._holding_job = Job('sleep 5', name="holding", hold=True)
+        self._holding_job = Job('sleep 5', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null')
         self.submit(self._holding_job)
         self.global_depends.append(self._holding_job.jobid)
 
@@ -66,16 +66,16 @@ class SGERunner(Runner):
         src += '#$ -terse\n'
         src += '#$ -N %s\n' % (job.name if job.name[0] in string.ascii_letters else 'mvp_%s' % job.name)
 
-        if 'hold' in jobopts:
+        if 'hold' in jobopts and jobopts['hold']:
             src += '#$ -h\n'
 
-        if 'env' in jobopts:
+        if 'env' in jobopts and jobopts['env']:
             src += '#$ -V\n'
 
         if 'walltime' in jobopts:
             src += '#$ -l h_rt=%s\n' % mvpipe.support.calc_time(jobopts['walltime'])
 
-        if 'procs' in jobopts:
+        if 'procs' in jobopts and int(jobopts['procs']) > 1:
             src += '#$ -pe %s %s\n' % (self.parallelenv, jobopts['procs'])
 
         if 'mem' in jobopts:
