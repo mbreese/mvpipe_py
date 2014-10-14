@@ -11,7 +11,7 @@ class SGERunner(Runner):
     def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, parallelenv='shm'):
         Runner.__init__(self, dryrun, verbose, logger)
         self.global_hold = global_hold
-        self.global_hold_jobid = None
+        self._holding_job = None
         self.global_depends = global_depends if global_depends else []
         self.account = account
         self.parallelenv = parallelenv
@@ -25,19 +25,24 @@ class SGERunner(Runner):
         pass
 
     def done(self):
+        if self._holding_job:
+            self.qrls(self._holding_job.jobid)
         pass
 
     def _setup_holding_job(self):
-        holding_job = Job('sleep 5', name="holding", hold=True)
-        self.submit(holding_job)
-        self.global_hold_jobid = holding_job.jobid
-        self.global_depends.append(holding_job.jobid)
+        self._holding_job = Job('sleep 5', name="holding", hold=True)
+        self.submit(self._holding_job)
+        self.global_depends.append(self._holding_job.jobid)
+
+    def qrls(self, jobid):
+        if not self.dryrun:
+            subprocess.call(["qrls", jobid])
 
     def submit(self, job):
         if not job.src:
             return
 
-        if self.global_host and not self.global_hold_jobid:
+        if self.global_hold and not self._holding_job:
             self._setup_holding_job()
 
         body = ''
@@ -92,7 +97,7 @@ class SGERunner(Runner):
         if job.depids or self.global_depends:
             depids = job.depids
             if self.global_depends:
-                depids.extend(self.global_depends.split(','))
+                depids.extend(self.global_depends)
 
             if depids:
                 src += '#$ -hold_jid %s\n' % ','.join(depids)

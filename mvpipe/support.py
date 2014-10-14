@@ -29,7 +29,7 @@ def target_exists(fname):
     return False
 
 
-def calc_time(self, val, multiplier=1):
+def calc_time(val, multiplier=1):
     seconds = 0
     if ':' in val:
         cols = [int(x) for x in val.split(':')]

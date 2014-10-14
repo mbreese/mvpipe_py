@@ -120,13 +120,13 @@ class PipelineLoader(object):
             if '__setup__' in tgt.outputs:
                 cmd = tgt.eval_src()
                 self.log("[setup]")
-                for line in cmd:
+                for line in cmd.out:
                         self.log("setup: %s" % line.strip())
                 
                 if self.dryrun:
                     return
 
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                proc = subprocess.Popen(cmd.out, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 out, err = proc.communicate()
                 if out:
                     self.log("     : %s" % out)
@@ -139,14 +139,14 @@ class PipelineLoader(object):
             if '__teardown__' in tgt.outputs:
                 cmd = tgt.eval_src()
                 self.log("[teardown]")
-                for line in cmd:
+                for line in cmd.out:
                     if line and line.strip():
                         self.log("teardown: %s" % line.strip())
 
                 if self.dryrun:
                     return
 
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+                proc = subprocess.Popen(cmd.out, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
                 out, err = proc.communicate()
                 if out:
                     self.log("     : %s" % out)
@@ -170,9 +170,9 @@ class PipelineLoader(object):
 
         for tgt in self.context._targets:
             if '__pre__' in tgt.outputs:
-                pre = '\n'.join(tgt.eval_src())
+                pre = '\n'.join(tgt.eval_src().out)
             if '__post__' in tgt.outputs:
-                post = '\n'.join(tgt.eval_src())
+                post = '\n'.join(tgt.eval_src().out)
             if not target:
                 for out in tgt.outputs:
                     if out not in ['__pre__', '__post__', '__setup__', '__teardown__']:
