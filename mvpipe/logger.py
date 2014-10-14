@@ -29,6 +29,7 @@ class FileLogger(object):
     def set_fname(self, fname):
         if self.fobj:
             self.fobj.close()
+
         self.fobj = open(fname, 'a')
         self.fname = fname
         self.sep()
