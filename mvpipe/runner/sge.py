@@ -95,7 +95,7 @@ class SGERunner(Runner):
                 src += '#$ -l h_vmem=%s\n' % jobopts['mem']
 
         if 'stack' in jobopts:
-            src += ' #$ -l h_stack=%s\n' % jobopts['stack']
+            src += '#$ -l h_stack=%s\n' % jobopts['stack']
 
         if job.depids or self.global_depends:
             depids = job.depids
