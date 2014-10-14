@@ -558,7 +558,7 @@ class TargetContext(ExecContext):
         ctx = TargetExecContext(self._clonevals(), outputs, inputs, numargs, verbose=self.verbose)
         for line in self._body:
             ctx.parse_line(line)
-        return ctx.out
+        return ctx
 
 
 class TargetExecContext(ExecContext):
