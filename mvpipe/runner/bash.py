@@ -36,6 +36,7 @@ class BashRunner(Runner):
             print '#!%s' % self.interpreter
             print self.out
             print ""
+            
             print self.pre
             for func in self.funcs:
                 print "%s" % func

@@ -5,7 +5,6 @@ class Job(object):
         self.jobid = None
 
         # these are job runner specific settings
-        print kwargs
         self.args=kwargs
 
         self.src = src

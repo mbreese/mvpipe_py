@@ -165,8 +165,8 @@ class PipelineLoader(object):
         self.missing = []
         self.pending_jobs = {}
 
-        pre = []
-        post = []
+        pre = ''
+        post = ''
 
         for tgt in self.context._targets:
             if '__pre__' in tgt.outputs:
@@ -218,22 +218,23 @@ class PipelineLoader(object):
                         if job.depids:
                             self.log("     requires: %s" % (','.join(job.depids)))
 
-                        
-                        for i, line in enumerate(job.pre.split('\n')):
-                            if i == 0:
-                                self.log("          pre: %s" % line)
-                            else:
-                                self.log("             : %s" % line)
+                        if job.pre: 
+                            for i, line in enumerate(job.pre.split('\n')):
+                                if i == 0:
+                                    self.log("          pre: %s" % line)
+                                else:
+                                    self.log("             : %s" % line)
                         for i, line in enumerate(job.src.split('\n')):
                             if i == 0:
                                 self.log("          src: %s" % line)
                             else:
                                 self.log("             : %s" % line)
-                        for i, line in enumerate(job.post.split('\n')):
-                            if i == 0:
-                                self.log("         post: %s" % line)
-                            else:
-                                self.log("             : %s" % line)
+                        if job.post:
+                            for i, line in enumerate(job.post.split('\n')):
+                                if i == 0:
+                                    self.log("         post: %s" % line)
+                                else:
+                                    self.log("             : %s" % line)
 
                         for out in job.outputs:
                             self.output_jobs[out] = job.jobid
