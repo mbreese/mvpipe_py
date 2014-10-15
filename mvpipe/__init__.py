@@ -73,6 +73,12 @@ class PipelineLoader(object):
         self.log("Setting output-file: %s" % fname)
         self._outfile = fname
         self.outfile_jobids = {}
+
+        if not os.path.exists(fname):
+            f = open(fname, 'w')
+            f.close()
+            return
+
         with open(fname) as f:
             for line in f:
                 cols = line.strip('\n').split('\t')
