@@ -278,9 +278,9 @@ class ExecContext(object):
             while m:
                 if m.group(2):
                     mi = int(m.group(2)) - 1
-                    if mi < len(self._var_numargs):
+                    if mi < len(self.var_numargs):
                         # print "var found => %s" % m.group(2)
-                        token = '%s%s%s' % (m.group(1), self._var_numargs[mi], m.group(3))
+                        token = '%s%s%s' % (m.group(1), self.var_numargs[mi], m.group(3))
                         m = regex.match(token)
                     else:
                         raise mvpipe.ParseError("Unknown num-arg: ${%s}" % m.group(2))
@@ -295,13 +295,13 @@ class ExecContext(object):
             while m:
                 if m.group(2):
                     mi = int(m.group(2)) - 1
-                    if 0 <= mi and mi < len(self._var_inputs):
+                    if 0 <= mi and mi < len(self.var_inputs):
                         # print "var found => %s" % m.group(2)
-                        token = '%s%s%s' % (m.group(1), self._var_inputs[mi], m.group(3))
+                        token = '%s%s%s' % (m.group(1), self.var_inputs[mi], m.group(3))
                     else:
                         raise mvpipe.ParseError("Unknown input-num: $<%s" % m.group(2))
                 else:
-                    token = '%s%s%s' % (m.group(1), ' '.join(self._var_inputs), m.group(3))
+                    token = '%s%s%s' % (m.group(1), ' '.join(self.var_inputs), m.group(3))
 
                 m = regex.match(token)
 
@@ -313,13 +313,13 @@ class ExecContext(object):
             while m:
                 if m.group(2):
                     mi = int(m.group(2)) - 1
-                    if mi < len(self._var_outputs):
+                    if mi < len(self.var_outputs):
                         # print "var found => %s" % m.group(2)
-                        token = '%s%s%s' % (m.group(1), self._var_outputs[mi], m.group(3))
+                        token = '%s%s%s' % (m.group(1), self.var_outputs[mi], m.group(3))
                     else:
                         raise mvpipe.ParseError("Unknown output-num: $>%s" % m.group(2))
                 else:
-                    token = '%s%s%s' % (m.group(1), ' '.join(self._var_outputs), m.group(3))
+                    token = '%s%s%s' % (m.group(1), ' '.join(self.var_outputs), m.group(3))
                 
                 m = regex.match(token)
 
