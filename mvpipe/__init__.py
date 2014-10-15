@@ -36,7 +36,7 @@ class PipelineLoader(object):
         self.verbose = verbose
         self.dryrun = dryrun
         self.paths = []
-        self.libpath = libpath.split(':') if libpath else None
+        self.libpath = [os.path.expanduser(x) for x in libpath.split(':')] if libpath else []
         self.logger = logger
         self.output_jobs = {}
         self.pending_jobs = {}
@@ -71,7 +71,7 @@ class PipelineLoader(object):
     def load_file(self, fname):
         srcfile = None
 
-        if os.path.exists(fname):
+        if os.path.exists(os.path.expanduser(fname)):
             # abs path (or current dir)
             srcfile = fname
 
