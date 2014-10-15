@@ -33,6 +33,30 @@ class ExecContext(object):
         return '<%s:%s>' % (self.__class__.__name__, self.level)
 
     @property
+    def var_outputs(self):
+        if self._var_outputs:
+            return self._var_outputs
+        elif self.parent:
+            return self.parent.var_outputs
+        return None
+
+    @property
+    def var_inputs(self):
+        if self._var_inputs:
+            return self._var_inputs
+        elif self.parent:
+            return self.parent.var_inputs
+        return None
+
+    @property
+    def var_numargs(self):
+        if self._var_numargs:
+            return self._var_numargs
+        elif self.parent:
+            return self.parent.var_numargs
+        return None
+
+    @property
     def root(self):
         if self.parent:
             return self.parent.root
@@ -246,10 +270,8 @@ class ExecContext(object):
                 else:
                     m = None
 
-
-
         # global numarg-replace
-        if self._var_numargs:
+        if self.var_numargs:
             regex = re.compile('^(.*)\$\{([0-9]+)\}(.*)$')
             m = regex.match(token)
 
@@ -266,7 +288,7 @@ class ExecContext(object):
                     m = None
 
         # inputs-replace
-        if self._var_inputs:
+        if self.var_inputs:
             regex = re.compile('^(.*)\$\<([0-9]*)(.*)$')
             m = regex.match(token)
 
@@ -284,7 +306,7 @@ class ExecContext(object):
                 m = regex.match(token)
 
         # outputs-replace
-        if self._var_outputs:
+        if self.var_outputs:
             regex = re.compile('^(.*)\$\>([0-9]*)(.*)$')
             m = regex.match(token)
 
