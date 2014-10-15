@@ -42,7 +42,7 @@ def load_config(defaults=None):
     return _config
 
 
-def _config_prefix(prefix):
+def config_prefix(prefix):
     out = {}
     for k in _config:
         if k[:len(prefix)] == prefix:
@@ -52,10 +52,10 @@ def _config_prefix(prefix):
 
 def get_runner(dryrun=False, verbose=False, logger=None):
     if _config['mvpipe.runner'] == 'sge':
-        return runner.sge.SGERunner(dryrun=dryrun, verbose=verbose, logger=logger, **_config_prefix('mvpipe.runner.sge.'))
+        return runner.sge.SGERunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.sge.'))
 
     if _config['mvpipe.runner'] == 'bash':
-        return runner.bash.BashRunner(dryrun=dryrun, verbose=verbose, logger=logger, **_config_prefix('mvpipe.runner.bash.'))
+        return runner.bash.BashRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.bash.'))
 
     return runner.get_runner()
 

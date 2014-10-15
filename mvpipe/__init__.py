@@ -14,6 +14,11 @@ def parse(fname, args, logfile=None, dryrun=False, verbose=False, **kwargs):
 
     runner_inst = config.get_runner(dryrun, verbose, log_inst)
 
+    loader_config = config_args.config_prefix('mvpipe.loader.')
+    for k in loader_config:
+        if not k in kwargs:
+            kwargs[k] = loader_config[k]
+
     loader = PipelineLoader(config_args, runner_inst=runner_inst, logger=log_inst, dryrun=dryrun, verbose=verbose, **kwargs)
     loader.load_file(fname)
     return loader
@@ -26,11 +31,12 @@ class ParseError(Exception):
 
 
 class PipelineLoader(object):
-    def __init__(self, args, runner_inst, logger=None, dryrun=False, verbose=False):
+    def __init__(self, args, runner_inst, logger=None, dryrun=False, verbose=False, libpath=None):
         self.context = context.RootContext(None, args, loader=self, verbose=verbose)
         self.verbose = verbose
         self.dryrun = dryrun
         self.paths = []
+        self.libpath = libpath.split(':') if libpath else None
         self.logger = logger
         self.output_jobs = {}
         self.pending_jobs = {}
@@ -74,10 +80,11 @@ class PipelineLoader(object):
             if os.path.exists(os.path.join(self.paths[0], fname)):
                 srcfile = os.path.join(self.paths[0],fname)
 
-        if not srcfile:
-            # cwd
-            if os.path.exists(os.path.join(os.getcwd(), fname)):
-                srcfile = os.path.join(os.getcwd(),fname)
+        if not srcfile and self.libpath:
+            for path in self.libpath:
+                if os.path.exists(os.path.join(path, fname)):
+                    srcfile = os.path.join(path,fname)
+                    break
 
         if not srcfile:
             raise ParseError("Error loading file: %s" % fname)
