@@ -8,7 +8,7 @@ class Job(object):
         self.args=kwargs
 
         self.src = src
-        self.outputs = outputs
+        self.outputs = outputs if outputs else []
         self.pre = pre
         self.post = post
 
