@@ -51,9 +51,6 @@ if __name__ == '__main__':
                 if fname:
                     sys.stderr.write("You can only specify one file (-f)!\n")
                     sys.exit(1)
-                if not os.path.exists(arg):
-                    sys.stderr.write("Can't find file: %s\n", arg)
-                    sys.exit(1)
                 fname = arg
             elif last == '-l':
                 logfile = arg
