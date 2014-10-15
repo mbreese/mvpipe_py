@@ -16,7 +16,7 @@ class SGERunner(Runner):
         self.account = account
         self.parallelenv = parallelenv
 
-        self.jobids = {}
+        self.jobids = []
 
         self.testjobcount = 1
         self._name = 'sge-job'
@@ -24,10 +24,17 @@ class SGERunner(Runner):
     def reset(self):
         pass
 
-    def done(self):
+    def abort(self):
         if self._holding_job:
-            self.qrls(self._holding_job.jobid)
-        pass
+            self.qdel(self._holding_job.jobid)
+        else:
+            for jobid in self.jobids:
+                self.qdel(jobid)
+
+    def done(self):
+        if not self.dryrun:
+            if self._holding_job:
+                self.qrls(self._holding_job.jobid)
 
     def _setup_holding_job(self):
         self._holding_job = Job('sleep 5', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null', walltime="00:00:30")
@@ -35,8 +42,10 @@ class SGERunner(Runner):
         self.global_depends.append(self._holding_job.jobid)
 
     def qrls(self, jobid):
-        if not self.dryrun:
-            subprocess.call(["qrls", jobid])
+        subprocess.call(["qrls", jobid])
+
+    def qdel(self, jobid):
+        subprocess.call(["qdel", jobid])
 
     def submit(self, job):
         if not job.src:
@@ -213,6 +222,7 @@ class SGERunner(Runner):
         #     self._output_jobs[out] = jobid
 
         print jobid
+        self.jobids.append(jobid)
 
         self.log('job: %s' % jobid)
         for line in src.split('\n'):
