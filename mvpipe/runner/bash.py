@@ -34,6 +34,7 @@ class BashRunner(Runner):
         self.reset()
         if self.out:
             print '#!%s' % self.interpreter
+            print "set -o pipefail"
             print self.out
             print ""
             
@@ -54,7 +55,14 @@ class BashRunner(Runner):
         if src:
             func = "job_%s" % (len(self.funcs) + 1)
             self.funcs.append(func)
-            self.body+="%s() {\n%s\n}\n" % (func, src)
+            self.body += '%s() {\n' % func
+            self.body += '%s\n' % src
+            self.body += 'if [ $? -ne 0 ]; then\n'
+            for out in job.outputs:
+                self.body += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
+            self.body += 'fi\n'
+            self.body += '}\n'
+
             job.jobid = func
 
             # for out in job.outputs:
