@@ -30,7 +30,7 @@ class SGERunner(Runner):
         pass
 
     def _setup_holding_job(self):
-        self._holding_job = Job('sleep 5', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null')
+        self._holding_job = Job('sleep 5', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null', walltime="00:00:30")
         self.submit(self._holding_job)
         self.global_depends.append(self._holding_job.jobid)
 
