@@ -13,8 +13,8 @@ def parse(fname, args, logfile=None, dryrun=False, verbose=False, **kwargs):
     log_inst = logger.FileLogger(logfile)
 
     runner_inst = config.get_runner(dryrun, verbose, log_inst)
+    loader_config = config.config_prefix('mvpipe.loader.')
 
-    loader_config = config_args.config_prefix('mvpipe.loader.')
     for k in loader_config:
         if not k in kwargs:
             kwargs[k] = loader_config[k]
