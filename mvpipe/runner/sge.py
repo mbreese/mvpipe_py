@@ -41,6 +41,11 @@ class SGERunner(Runner):
         self.submit(self._holding_job)
         self.global_depends.append(self._holding_job.jobid)
 
+    def check_jobid(self, jobid):
+        if subprocess.call(["qstat", "-j", jobid]) == 0:
+            return True
+        return False
+
     def qrls(self, jobid):
         subprocess.call(["qrls", jobid])
 

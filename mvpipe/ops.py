@@ -189,3 +189,12 @@ def logop(context, line):
         return True
     return False
 
+def outfileop(context, line):
+    if line.split(' ', 1)[0] == 'outfile':
+        fname = context.replace_token(line.split(' ', 1)[1].strip())
+        if fname[0] == '"' and fname[-1] == '"':
+            fname = fname[1:-1]
+        context.root.loader.set_outfile(fname)
+        return True
+    return False
+

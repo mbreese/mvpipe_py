@@ -393,6 +393,9 @@ class RootContext(ExecContext):
                 if ops.logop(self, line[2:].strip()):
                     return True
 
+                if ops.outfileop(self, line[2:].strip()):
+                    return True
+
         return False
 
 

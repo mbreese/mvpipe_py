@@ -76,9 +76,7 @@ class Runner(object):
 
         # self._output_jobs = {}
 
-    def check_file_exists(self, fname):
-        # if fname in self._output_jobs:
-        #     return True, self._output_jobs[fname]
+    def check_jobid(self, jobid):
         return False, None
 
     def reset(self):

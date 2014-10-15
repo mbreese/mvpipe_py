@@ -8,7 +8,7 @@ import logger
 import runner
 import config
 
-def parse(fname, args, logfile=None, dryrun=False, verbose=False, **kwargs):
+def parse(fname, args, logfile=None, outfile=None, dryrun=False, verbose=False, **kwargs):
     config_args = config.load_config(args)
     log_inst = logger.FileLogger(logfile)
 
@@ -19,7 +19,7 @@ def parse(fname, args, logfile=None, dryrun=False, verbose=False, **kwargs):
         if not k in kwargs:
             kwargs[k] = loader_config[k]
 
-    loader = PipelineLoader(config_args, runner_inst=runner_inst, logger=log_inst, dryrun=dryrun, verbose=verbose, **kwargs)
+    loader = PipelineLoader(config_args, runner_inst=runner_inst, logger=log_inst, outfile=outfile, dryrun=dryrun, verbose=verbose, **kwargs)
     loader.load_file(fname)
     return loader
 
@@ -31,7 +31,7 @@ class ParseError(Exception):
 
 
 class PipelineLoader(object):
-    def __init__(self, args, runner_inst, logger=None, dryrun=False, verbose=False, libpath=None):
+    def __init__(self, args, runner_inst, logger=None, dryrun=False, verbose=False, libpath=None, outfile=None):
         self.context = context.RootContext(None, args, loader=self, verbose=verbose)
         self.verbose = verbose
         self.dryrun = dryrun
@@ -42,6 +42,10 @@ class PipelineLoader(object):
         self.pending_jobs = {}
         self.runner_inst = runner_inst
         self.is_setup = False
+
+        self._outfile = None
+        if outfile:
+            self.set_outfile(outfile)
 
     def close(self):
         self.runner_inst.done()
@@ -59,6 +63,20 @@ class PipelineLoader(object):
     def set_log(self, fname):
         if self.logger:
             self.logger.set_fname(fname)
+
+    def write_outfile(self, outfile, jobid):
+        if self._outfile:
+            with open(self._outfile, 'a') as f:
+                f.write('%s\t%s\n' % (outfile, jobid))
+
+    def set_outfile(self, fname):
+        self.log("Setting output-file: %s" % fname)
+        self._outfile = fname
+        self.outfile_jobids = {}
+        with open(fname) as f:
+            for line in f:
+                cols = line.strip('\n').split('\t')
+                self.outfile_jobids[cols[0]] = cols[1]
 
     def log(self, msg, stderr=False):
         if self.logger:
@@ -250,6 +268,7 @@ class PipelineLoader(object):
 
                         for out in job.outputs:
                             self.output_jobs[out] = job.jobid
+                            self.write_outfile(out, job.jobid)
 
 
             if len(submitted) != len(joblist):
@@ -279,10 +298,11 @@ class PipelineLoader(object):
                 self.log('%s  - %s already set to be built (%s)' % (indentstr, target, self.output_jobs[target]))
                 return True, self.output_jobs[target]
 
-            exists, jobid = self.runner_inst.check_file_exists(target)
-            if exists:
-                self.log('%s - %s already set to be built by existing job' % (indentstr, target))
-                return True, jobid
+            if target in self.outfile_jobids:
+                valid = self.runner_inst.check_jobid(self.outfile_jobids[target])
+                if valid:
+                    self.log('%s - %s already set to be built by existing job (%s)' % (indentstr, target, self.outfile_jobids[target]))
+                    return True, self.outfile_jobids[target]
 
         target_found = False
         
