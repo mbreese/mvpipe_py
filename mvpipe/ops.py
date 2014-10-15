@@ -18,7 +18,7 @@ def setop(context, line):
         return True
     return False
 
-regex_setine = re.compile('^([A-Za-z_\.][A-Za-z0-9_\.]*)[ \t]*\+\?=[ \t]*(.*)$')
+regex_setine = re.compile('^([A-Za-z_\.][A-Za-z0-9_\.]*)[ \t]*\?=[ \t]*(.*)$')
 def setineop(context, line):
     m = regex_setine.match(line)
     if m:

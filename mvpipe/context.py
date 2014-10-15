@@ -500,10 +500,13 @@ class TargetContext(ExecContext):
             self.inputs = [x.strip() for x in self.replace_token(spl[1]).split()]
         except:
             self.badtarget = True
+            self.inputs = None
 
-        # print self.defline
-        # print self.outputs
-        # print self.inputs
+#        print self.defline
+#        print self.outputs
+#        print [x.pattern for x in self.outputs_regex]
+#        if self.inputs:
+#            print self.inputs
 
     def __repr__(self):
         return self.defline
