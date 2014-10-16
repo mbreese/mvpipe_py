@@ -44,6 +44,7 @@ class PipelineLoader(object):
         self.is_setup = False
 
         self._outfile = None
+        self.outfile_jobids = {}
         if outfile:
             self.set_outfile(outfile)
 
@@ -88,7 +89,6 @@ class PipelineLoader(object):
         with open(fname, 'w') as f:
             for k in self.outfile_jobids:
                 f.write('%s\t%s\n' % (k, self.outfile_jobids[k]))
-
 
     def log(self, msg, stderr=False):
         if self.logger:
