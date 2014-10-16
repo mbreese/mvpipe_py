@@ -1,14 +1,16 @@
 import os
+import subprocess
 from mvpipe.runner import Runner
 
 class BashRunner(Runner):
-    def __init__(self, dryrun, verbose, logger, interpreter=None):
+    def __init__(self, dryrun, verbose, logger, interpreter=None, autoexec=False):
         Runner.__init__(self, dryrun, verbose, logger)
         self.funcs = []
         self.pre =  ''
         self.post = ''
         self.body = ''
         self.out = ''
+        self.autoexec = autoexec
 
         self._name = 'bash-script'
         if interpreter:
@@ -32,16 +34,24 @@ class BashRunner(Runner):
 
     def done(self):
         self.reset()
+        src = ''
         if self.out:
-            print '#!%s' % self.interpreter
-            print "set -o pipefail"
-            print self.out
-            print ""
-            
-            print self.pre
+            src += '#!%s\n' % self.interpreter
+            src += "set -o pipefail\n"
+            src += '%s\n' % self.out
+            src += '\n'
+            src += '%s\n' % self.pre
+
             for func in self.funcs:
-                print "%s" % func
-            print self.post
+                src += '%s\n' % func
+            src += '%s\n' % self.post
+
+            print src
+
+            if self.autoexec:
+                proc = subprocess.Popen([self.interpreter], stdin=subprocess.PIPE)
+                proc.communicate(input=src)
+                proc.wait()
 
 
     def submit(self, job):
@@ -57,10 +67,18 @@ class BashRunner(Runner):
             self.funcs.append(func)
             self.body += '%s() {\n' % func
             self.body += '%s\n' % src
-            self.body += 'if [ $? -ne 0 ]; then\n'
+
+            test=False
+
             for out in job.outputs:
-                self.body += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
-            self.body += 'fi\n'
+                if out[0] != '.':
+                    if not test:
+                        self.body += 'if [ $? -ne 0 ]; then\n'
+                        test = True
+
+                    self.body += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
+            if test:
+                self.body += 'fi\n'
             self.body += '}\n'
 
             job.jobid = func
