@@ -84,6 +84,12 @@ class PipelineLoader(object):
                 cols = line.strip('\n').split('\t')
                 self.outfile_jobids[cols[0]] = cols[1]
 
+        # rewrite the outlog to remove duplicates...
+        with open(fname, 'w') as f:
+            for k in self.outfile_jobids:
+                f.write('%s\t%s\n' % (k, self.outfile_jobids[k]))
+
+
     def log(self, msg, stderr=False):
         if self.logger:
             self.logger.write(msg)
