@@ -86,9 +86,11 @@ class PipelineLoader(object):
                 self.outfile_jobids[cols[0]] = cols[1]
 
         # rewrite the outlog to remove duplicates...
-        with open(fname, 'w') as f:
-            for k in self.outfile_jobids:
-                f.write('%s\t%s\n' % (k, self.outfile_jobids[k]))
+        # 
+        # ON SECOND THOUGHT - KEEP THE DUPLICATES FOR BETTER LOGGING
+        #with open(fname, 'w') as f:
+        #    for k in self.outfile_jobids:
+        #        f.write('%s\t%s\n' % (k, self.outfile_jobids[k]))
 
     def log(self, msg, stderr=False):
         if self.logger:
@@ -250,6 +252,10 @@ class PipelineLoader(object):
                         continue
 
                     added = True
+
+                    # TODO - Support a job marked with "direct.exec" flag, 
+                    #        This should just run the job on the submission
+                    #        host without submitting it to the job runner
                     self.runner_inst.submit(job)
                     submitted.add(job)
 

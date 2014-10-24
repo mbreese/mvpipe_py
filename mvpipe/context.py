@@ -404,6 +404,12 @@ class IfContext(ExecContext):
         ExecContext.__init__(self, parent)
         self.test = test
 
+    def append(self, k, v):
+        self.parent.append(k,v)
+
+    def set_ine(self, k, v):
+        self.parent.set_ine(k,v)
+
     def set(self, k, v):
         self.parent.set(k,v)
 
@@ -419,6 +425,12 @@ class ElseContext(ExecContext):
     def __init__(self, parent):
         ExecContext.__init__(self, parent.parent)
         self.test = not parent.test
+
+    def append(self, k, v):
+        self.parent.append(k,v)
+
+    def set_ine(self, k, v):
+        self.parent.set_ine(k,v)
 
     def set(self, k, v):
         self.parent.set(k,v)
@@ -439,6 +451,12 @@ class ForContext(ExecContext):
         self.varlist = varlist
         self._body = []
         self.loop_count = 0
+
+    def append(self, k, v):
+        self.parent.append(k,v)
+
+    def set_ine(self, k, v):
+        self.parent.set_ine(k,v)
 
     def set(self, k, v):
         self.parent.set(k,v)

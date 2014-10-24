@@ -9,6 +9,7 @@ except:
     sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
     import mvpipe
 
+from mvpipe.support import autotype
 
 def usage():
 
@@ -52,18 +53,24 @@ if __name__ == '__main__':
                     sys.stderr.write("You can only specify one file (-f)!\n")
                     sys.exit(1)
                 fname = arg
+                last = None
             elif last == '-l':
                 logfile = arg
+                last = None
             elif last[:2] == '--':
                 var = last[2:]
-                if var in args:
-                    if type(args[var]) == list:
-                        args[var].append(arg)
-                    else:
-                        args[var] = [args[var], arg]
+                if arg[:2] == '--':
+                    args[var] = True
+                    last = arg
                 else:
-                    args[var] = arg
-            last = None
+                    if var in args:
+                        if type(args[var]) == list:
+                            args[var].append(autotype(arg))
+                        else:
+                            args[var] = [args[var], autotype(arg)]
+                    else:
+                        args[var] = autotype(arg)
+                    last = None
         elif arg == '-v':
             verbose = True
         elif arg == '-dr':
@@ -81,15 +88,17 @@ if __name__ == '__main__':
     if not fname:
         fname = 'Pipeline'
 
-    pipe = mvpipe.parse(fname, args, logfile=logfile, dryrun=dryrun, verbose=verbose)
+    pipe = None
 
-    # try:
-    if target:
+    try:
+        pipe = mvpipe.parse(fname, args, logfile=logfile, dryrun=dryrun, verbose=verbose)
+        if target:
             for t in target:
                 pipe.build(t)
-    else:
+        else:
             pipe.build(None)
-    pipe.close()
-    # except Exception, e:
-    #     pipe.abort()
-    #     sys.stderr.write('%s\n' % e)
+        pipe.close()
+    except mvpipe.ParseError, e:
+        if pipe:
+            pipe.abort()
+        sys.stderr.write('%s\n' % e)
