@@ -35,7 +35,7 @@ written to the log file, or included in the target script.
 
 `#$ foo = bar` Set a variable
 
-`#$ foo =? bar` Set a variable if it hasn't already been set
+`#$ foo ?= bar` Set a variable if it hasn't already been set
 
 `#$ foo += bar` Append a value to a list (if the variable has already been set,
 then this will convert that variable to a list)
@@ -54,8 +54,8 @@ This is the same as saying:
 
     ${var}          - Variable named "var". If "var" is a list, ${var} will
                       be replaced with a space-separated string with all
-                      members of the list. If "var" hasn't been set, then this
-                      will throw a ParseError exception.
+                      members of the list. **If "var" hasn't been set, then this
+                      will throw a ParseError exception.**
 
     ${var?}         - Optional variable substitution. This is the same as
                       above, except that if "var" hasn't been set, then it
@@ -77,6 +77,11 @@ You may also include the results from shell commands as well using the syntax
 `$(command)`. Anything surrounded by `$()` will be executed in the current shell.
 Anything written to stdout can be captured as a variable. 
 
+Example:
+
+    #$ submit_host = $(hostname)
+    #$ submit_date = $(date)
+
 ## If/Else/Endif
 
 Basic syntax:
@@ -93,6 +98,7 @@ time (there is no concept of foo==1 and bar==2)
 ### Conditions
 
 `#$ if ${foo}` - if the variable ${foo} was set
+`#$ if !${foo}` - if the variable ${foo} was not set
 
 `#$ if ${foo} == bar` - if the variable ${foo} equals the string "bar"
 `#$ if ${foo} != bar` - if the variable ${foo} doesn't equal the string "bar"
@@ -102,12 +108,17 @@ time (there is no concept of foo==1 and bar==2)
 `#$ if ${foo} > 1`    
 `#$ if ${foo} >= 1`    
 
+
 ## For loops
 
 Basic syntax:
 
     #$ for i in {start}..{end}
        do something...
+    #$ done
+
+    #$ for i in 1..10
+        do something...
     #$ done
 
     #$ for i in ${list}
@@ -191,6 +202,16 @@ Pipeline will be written to the last log file specified.
 
 You may also specify a log file from the command-line with the `-l logfile`
 command-line argument.
+
+## Output logs
+You can keep track of which files are scheduled to be created using an output log.
+Do use this, you can use the `#$ outfile filename` directive. If you set an outfile,
+then in addition to checking the local filesystem to see if a target already exists,
+this file will also be consulted. This file keeps track of outputs that will be made
+by a job. It will then check with the job runner to see if the job is still active.
+
+This way you can avoid re-submitting the same jobs over and over again if you re-run
+the Pipeline.
 
 ## Comments
 Comments are started with two `##` characters. If a line starts with only one
