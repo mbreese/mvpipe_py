@@ -1,0 +1,5 @@
+#!../bin/mvpipe
+#$ foo ?= bar
+# foo = ${foo}!!!!
+
+all:

@@ -46,8 +46,10 @@ if __name__ == '__main__':
     dryrun = False
 
     last = None
-    for arg in sys.argv[1:]:
-        if last:
+    for i, arg in enumerate(sys.argv[1:]):
+        if i == 0 and os.path.exists(arg):
+            fname = arg
+        elif last:
             if last == '-f':
                 if fname:
                     sys.stderr.write("You can only specify one file (-f)!\n")
@@ -85,10 +87,10 @@ if __name__ == '__main__':
         #     sys.stderr.write("Don't know how to deal with argument: %s\n" % arg)
         #     sys.exit(1)
 
-    if not fname:
-        fname = 'Pipeline'
-
     pipe = None
+
+    if not fname:
+        usage()
 
     try:
         pipe = mvpipe.parse(fname, args, logfile=logfile, dryrun=dryrun, verbose=verbose)

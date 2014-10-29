@@ -102,55 +102,65 @@ class PipelineLoader(object):
 
     def load_file(self, fname):
         srcfile = None
+        if fname == '-':
+            f = sys.stdin
+        else:
+            if os.path.exists(os.path.expanduser(fname)):
+                # abs path (or current dir)
+                srcfile = fname
 
-        if os.path.exists(os.path.expanduser(fname)):
-            # abs path (or current dir)
-            srcfile = fname
+            if not srcfile and self.paths:
+                # dir of the current file
+                if os.path.exists(os.path.join(self.paths[0], fname)):
+                    srcfile = os.path.join(self.paths[0],fname)
 
-        if not srcfile and self.paths:
-            # dir of the current file
-            if os.path.exists(os.path.join(self.paths[0], fname)):
-                srcfile = os.path.join(self.paths[0],fname)
+            if not srcfile and self.libpath:
+                for path in self.libpath:
+                    if os.path.exists(os.path.join(path, fname)):
+                        srcfile = os.path.join(path,fname)
+                        break
 
-        if not srcfile and self.libpath:
-            for path in self.libpath:
-                if os.path.exists(os.path.join(path, fname)):
-                    srcfile = os.path.join(path,fname)
-                    break
+            if not srcfile:
+                raise ParseError("Error loading file: %s" % fname)
 
-        if not srcfile:
-            raise ParseError("Error loading file: %s" % fname)
-
-        self.log("Loading file: %s" % (os.path.relpath(srcfile)))
-
-        with open(srcfile) as f:
+            self.log("Loading file: %s" % (os.path.relpath(srcfile)))
+            f = open(srcfile)
             self.paths.append(os.path.dirname(os.path.abspath(srcfile)))
-            for i, line in enumerate(f):
-                if not line or not line.strip():
+
+        for i, line in enumerate(f):
+            if not line or not line.strip():
+                continue
+
+            line = line.strip('\n')
+
+            if i == 0 and line[:2] == '#!':
+                continue
+
+            if line[:2] == '##':
+                continue
+
+            if line[:2] == '#$':
+                spl = line[2:].split('#')
+                line = '#$%s' % spl[0]
+                line = line.strip()
+                if not line:
                     continue
 
-                line = line.strip('\n')
+            try:
+                self.context.parse_line(line)
+            except ParseError, e:
+                self.log('ERROR: %s\n[%s:%s] %s\n\n' % (e, fname, i+1, line), True)
+                f.close()
+                sys.exit(1)
+        f.close()
 
-                if line[:2] == '##':
-                    continue
-
-                if line[:2] == '#$':
-                    spl = line[2:].split('#')
-                    line = '#$%s' % spl[0]
-                    line = line.strip()
-                    if not line:
-                        continue
-
-                try:
-                    self.context.parse_line(line)
-                except ParseError, e:
-                    self.log('ERROR: %s\n[%s:%s] %s\n\n' % (e, fname, i+1, line), True)
-                    sys.exit(1)
-
+        if fname != '-':
             self.paths = self.paths[:-1]
 
         for line in self.context.out:
             self.log(line)
+            if line and line[0] == '#':
+                sys.stderr.write('%s\n' % line)
 
 
     def setup(self):
@@ -294,7 +304,7 @@ class PipelineLoader(object):
 
         else:
             if self.missing:
-                self.log("Missing files: %s\n" % ', '.join(self.missing), True)
+                self.log("Missing files: %s\n" % ', '.join([str(x) for x in self.missing]), True)
 
             raise ParseError("ERROR: Can't build target: %s\n" % target)
 

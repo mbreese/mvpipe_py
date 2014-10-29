@@ -1,4 +1,5 @@
 # echo'd comments start with '#'
+# echo'd comments start with '#'
 ## real comments start with '##'
 ##$ log "test1.log"
 ## global job settings (settings start with '#$')
