@@ -1,0 +1,3 @@
+[submodule "sjq"]
+	path = sjq
+	url = https://github.com/mbreese/sjq.git

@@ -9,6 +9,14 @@ except:
     sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
     import mvpipe
 
+try:
+    import sjq
+except:
+    sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'sjq'))
+    import sjq
+    assert sjq
+
+
 from mvpipe.support import autotype
 
 def usage():
