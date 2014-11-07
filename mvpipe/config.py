@@ -3,6 +3,7 @@ import support
 import runner
 import runner.bash
 import runner.sge
+import runner.sjq
 import socket
 
 CONFIG_FILE=os.path.expanduser("~/.mvpiperc")
