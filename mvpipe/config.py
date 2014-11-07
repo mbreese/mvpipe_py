@@ -6,6 +6,7 @@ import runner.sge
 import socket
 
 CONFIG_FILE=os.path.expanduser("~/.mvpiperc")
+GLOBAL_CONFIG_FILE=os.path.join(os.path.dirname(__file__), "..", ".mvpiperc")
 
 _config = None
 
@@ -13,8 +14,6 @@ _defconfig = {
     'mvpipe.runner': 'bash',
     'mvpipe.host': socket.gethostname()
 }
-
-
 
 def get_config():
     global _config
@@ -29,9 +28,12 @@ def load_config(defaults=None):
     if not _config:
         _config = _defconfig
 
-    if defaults:
-        for k in defaults:
-            _config[k] = defaults[k]
+    if os.path.exists(GLOBAL_CONFIG_FILE):
+        with open(GLOBAL_CONFIG_FILE) as f:
+            for line in f:
+                if '=' in line:
+                    spl = [x.strip() for x in line.strip().split('=',1)]
+                    _config[spl[0]] = support.autotype(spl[1])
 
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE) as f:
@@ -39,6 +41,11 @@ def load_config(defaults=None):
                 if '=' in line:
                     spl = [x.strip() for x in line.strip().split('=',1)]
                     _config[spl[0]] = support.autotype(spl[1])
+
+    if defaults:
+        for k in defaults:
+            _config[k] = defaults[k]
+
     return _config
 
 
