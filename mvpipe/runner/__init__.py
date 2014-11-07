@@ -2,6 +2,21 @@ import sys
 
 class Job(object):
     def __init__(self, src, outputs=None, name=None, depends=None, pre=None, post=None, **kwargs):
+        '''
+        kwargs are job-specific arguments that the runner may use to schedule the job
+
+        The runner may use the common settings or their own, but here are the suggested names:
+
+        env     - boolean, capture the current environment for the job (PATH)
+        wd      - the working directory
+        stdout  - path to redirect stdout
+        stderr  - path to redirect stderr
+        procs   - the number of processors the job requires
+        mem     - the TOTAL amount of memory for the job
+        hold    - this job should be held to be manually released by the user
+        depends - a list of job-ids for jobs that this one depends on
+
+        '''
         self.jobid = None
 
         # these are job runner specific settings

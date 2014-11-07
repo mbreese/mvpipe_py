@@ -7,19 +7,36 @@ from mvpipe.runner import Runner, Job
 
 def_options = {'env': True, 'wd': os.path.abspath(os.curdir), 'mail': 'ea', 'hold': False}
 
+'''
+SGE options:
+
+global_hold - start all pipelines with a "placeholder" job to synchronize
+              starts (and ensure that all jobs are submitted correctly
+              before releasing the pipeline
+
+account     - a default account to use
+
+parallelenv - the name of the parallel environment for multi-processor jobs
+              default: 'shm'
+
+hvmem_total - h_vmem should be specified as the total amount of memory, default
+              is to specify it as the amount of memory per-processor
+              (only used when procs > 1)
+
+'''
 class SGERunner(Runner):
-    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, parallelenv='shm'):
+    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, parallelenv='shm', hvmem_total=False):
         Runner.__init__(self, dryrun, verbose, logger)
         self.global_hold = global_hold
         self._holding_job = None
         self.global_depends = global_depends if global_depends else []
         self.account = account
         self.parallelenv = parallelenv
+        self.hvmem_total = hvmem_total
 
         self.jobids = []
 
         self.testjobcount = 1
-        self._name = 'sge-job'
 
     def reset(self):
         pass
@@ -94,7 +111,7 @@ class SGERunner(Runner):
             src += '#$ -pe %s %s\n' % (self.parallelenv, jobopts['procs'])
 
         if 'mem' in jobopts:
-            if 'procs' in jobopts:
+            if 'procs' in jobopts and not self.hvmem_total:
                 procs = int(jobopts['procs'])
 
                 #convert the mem option to a per-processor amount (save the units)
