@@ -65,7 +65,7 @@ def get_runner(dryrun=False, verbose=False, logger=None):
         return runner.bash.BashRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.bash.'))
 
     if _config['mvpipe.runner'] == 'sjq':
-        return runner.sqjrunner.SJQRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.sjq.'))
+        return runner.sjqrunner.SJQRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.sjq.'))
 
     return runner.get_runner()
 
