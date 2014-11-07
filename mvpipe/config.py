@@ -6,7 +6,7 @@ import runner.sge
 import socket
 
 CONFIG_FILE=os.path.expanduser("~/.mvpiperc")
-GLOBAL_CONFIG_FILE=os.path.join(os.path.dirname(__file__), "..", ".mvpiperc")
+GLOBAL_CONFIG_FILE=os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", ".mvpiperc")
 
 _config = None
 
