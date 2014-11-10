@@ -1,7 +1,7 @@
 '''
 Job runner for SJQ - Simple Job Queue
 
-SQJ is included with MVpipe as a single-user batch scheduler
+SJQ is included with MVpipe as a single-user batch scheduler
 
 '''
 
@@ -14,6 +14,7 @@ import subprocess
 from mvpipe.runner import Runner, Job
 
 import sjq.client
+import sjq.server
 
 def_options = {'env': True, 'cwd': os.path.abspath(os.curdir)}
 
@@ -29,12 +30,16 @@ class SJQRunner(Runner):
         self.testjobcount = 1
         self._name = 'sjqjob'
 
-        try:
-            self.sjq = sjq.client.SQJClient(verbose)
-        except socket.error:
-            sjq.server.start(False, {'sjq.autoshutdown': True}, daemon=True)
-            time.sleep(1)
-            self.sjq = sjq.client.SQJClient(verbose)
+
+        if self.dryrun:
+            self.sjq = None
+        else:
+            try:
+                self.sjq = sjq.client.SJQClient(verbose)
+            except socket.error:
+                sjq.server.start(False, {'sjq.autoshutdown': True}, daemon=True)
+                time.sleep(1)
+                self.sjq = sjq.client.SJQClient(verbose)
 
     def reset(self):
         pass
@@ -50,6 +55,7 @@ class SJQRunner(Runner):
         if not self.dryrun:
             if self._holding_job:
                 self.release(self._holding_job.jobid)
+            self.sjq.close()
 
     def _setup_holding_job(self):
         self._holding_job = Job('sleep 5', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null')
@@ -63,10 +69,12 @@ class SJQRunner(Runner):
             return False
 
     def release(self, jobid):
-        self.sjq.release(jobid)
+        if self.sjq:
+            self.sjq.release(jobid)
 
     def kill(self, jobid):
-        self.sjq.kill(jobid)
+        if self.sjq:
+            self.sjq.kill(jobid)
 
     def submit(self, job):
         if not job.src:

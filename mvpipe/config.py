@@ -19,7 +19,7 @@ _defconfig = {
 def get_config():
     global _config
     if not _config:
-        _config = _defconfig
+        load_config()
     return _config
 
 
