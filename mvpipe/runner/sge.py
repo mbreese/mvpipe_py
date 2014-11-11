@@ -25,7 +25,7 @@ hvmem_total - h_vmem should be specified as the total amount of memory, default
 
 '''
 class SGERunner(Runner):
-    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, parallelenv='shm', hvmem_total=False):
+    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, parallelenv='shm', hvmem_total=False, interpreter=None):
         Runner.__init__(self, dryrun, verbose, logger)
         self.global_hold = global_hold
         self._holding_job = None
@@ -37,6 +37,17 @@ class SGERunner(Runner):
         self.jobids = []
 
         self.testjobcount = 1
+
+        if interpreter:
+            self.interpreter = interpreter
+        else:
+            for intp in ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash']:
+                if os.path.exists(intp):
+                    self.interpreter = intp
+                    break
+            if not self.interpreter:
+                self.interpreter = '/bin/sh'
+
 
     def reset(self):
         pass
@@ -93,7 +104,7 @@ class SGERunner(Runner):
         for k in job.args:
             jobopts[k] = job.args[k]
 
-        src = '#!/bin/bash\n'
+        src = '#!%s\n' % self.interpreter
         src += '#$ -w e\n'
         src += '#$ -terse\n'
         src += '#$ -N %s\n' % (job.name if job.name[0] in string.ascii_letters else 'mvp_%s' % job.name)
