@@ -1,0 +1,19 @@
+#!/usr/bin/env mvpipe
+
+all: test1 test4
+
+test1:
+    #$ job.name=test1
+    touch test1
+
+test2: test3
+    #$ job.name=test2
+    touch test2
+
+test3:
+    #$ job.name=test3
+    exit 1
+
+test4: test2
+    #$ job.name=test4
+    touch test4

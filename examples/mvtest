@@ -1,0 +1,13 @@
+#!/usr/bin/env mvpipe
+
+all: test1 test2
+
+test1:
+    touch test1
+
+test2: test3
+    touch test2
+
+test3:
+    touch test3
+

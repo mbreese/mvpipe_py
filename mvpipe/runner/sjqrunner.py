@@ -9,8 +9,7 @@ import os
 import time
 import socket
 import string
-import subprocess
-
+import multiprocessing
 from mvpipe.runner import Runner, Job
 
 import sjq.client
@@ -31,15 +30,27 @@ class SJQRunner(Runner):
         self._name = 'sjqjob'
 
 
-        if self.dryrun:
-            self.sjq = None
-        else:
+        self.sjq = None
+        if not self.dryrun:
             try:
                 self.sjq = sjq.client.SJQClient(verbose)
             except socket.error:
-                sjq.server.start(False, {'sjq.autoshutdown': True}, daemon=True)
-                time.sleep(1)
-                self.sjq = sjq.client.SJQClient(verbose)
+                try:
+                    # TODO: When we daemonize this, we end up killing *this* process.
+                    #       Need to spawn a subprocess to actually start the SJQ server
+                    self.log("Missing SJQ server, starting one...")
+                    p = multiprocessing.Process(target=sjq.server.start, args=(False, {'sjq.autoshutdown': True, 'sjq.waittime': 60, 'sjq.logfile': '~/.sjq.log'}, True))
+                    p.start()
+#                    sjq.server.start(False, {'sjq.autoshutdown': True, 'sjq.waittime': 60}, daemon=True)
+                    time.sleep(5)
+                    self.sjq = sjq.client.SJQClient(verbose)
+                except Exception, e:
+                    print e
+
+        if not self.sjq:
+            self.log("Cannot start SJQ server - aborting!")
+            raise RuntimeError("Cannot start SJQ server - aborting!")
+
 
     def reset(self):
         pass
@@ -63,10 +74,17 @@ class SJQRunner(Runner):
         self.global_depends.append(self._holding_job.jobid)
 
     def check_jobid(self, jobid):
-        with open('/dev/null', 'w') as devnull:
-            if subprocess.call(["qstat", "-j", jobid], stdout=devnull, stderr=devnull) == 0:
-                return True
-            return False
+        if self.sjq:
+            ret = self.sjq.status(jobid)
+            for line in ret.split('\n'):
+                cols = line.strip().split('\t')
+                if cols[0] == str(jobid):
+                    if cols[2] in ['H', 'Q', 'U']:
+                        # If the status is anything other than these, then
+                        # the output file should have been made or won't be.
+                        return True
+
+        return False
 
     def release(self, jobid):
         if self.sjq:
