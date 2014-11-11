@@ -37,12 +37,11 @@ class SJQRunner(Runner):
             except socket.error:
                 try:
                     # TODO: When we daemonize this, we end up killing *this* process.
-                    #       Need to spawn a subprocess to actually start the SJQ server
+                    #       So we need to spawn a subprocess to actually start the SJQ server
                     self.log("Missing SJQ server, starting one...")
                     p = multiprocessing.Process(target=sjq.server.start, args=(False, {'sjq.autoshutdown': True, 'sjq.waittime': 60, 'sjq.logfile': '~/.sjq.log'}, True))
                     p.start()
-#                    sjq.server.start(False, {'sjq.autoshutdown': True, 'sjq.waittime': 60}, daemon=True)
-                    time.sleep(5)
+                    time.sleep(2)
                     self.sjq = sjq.client.SJQClient(verbose)
                 except Exception, e:
                     print e
