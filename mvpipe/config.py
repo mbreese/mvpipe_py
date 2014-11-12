@@ -4,6 +4,7 @@ import runner
 import runner.bash
 import runner.sge
 import runner.sjqrunner
+import runner.slurm
 import socket
 
 CONFIG_FILE=os.path.expanduser("~/.mvpiperc")
@@ -67,6 +68,9 @@ def get_runner(dryrun=False, verbose=False, logger=None):
 
     if _config['mvpipe.runner'] == 'sjq':
         return runner.sjqrunner.SJQRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.sjq.'))
+
+    if _config['mvpipe.runner'] == 'slurm':
+        return runner.slurm.SlurmRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.slurm.'))
 
     return runner.get_runner()
 
