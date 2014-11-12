@@ -18,7 +18,7 @@ import sjq.server
 def_options = {'env': True, 'cwd': os.path.abspath(os.curdir)}
 
 class SJQRunner(Runner):
-    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, interpreter=None):
+    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, shell=None):
         Runner.__init__(self, dryrun, verbose, logger)
         self.global_hold = global_hold
         self._holding_job = None
@@ -29,15 +29,15 @@ class SJQRunner(Runner):
         self.testjobcount = 1
         self._name = 'sjqjob'
 
-        if interpreter:
-            self.interpreter = interpreter
+        if shell:
+            self.shell = shell
         else:
             for intp in ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash']:
                 if os.path.exists(intp):
-                    self.interpreter = intp
+                    self.shell = intp
                     break
-            if not self.interpreter:
-                self.interpreter = '/bin/sh'
+            if not self.shell:
+                self.shell = '/bin/sh'
 
         self.sjq = None
         if not self.dryrun:
@@ -164,7 +164,7 @@ class SJQRunner(Runner):
             depends = ':'.join(depids)
 
 
-        src = '#!%s\n' % self.interpreter
+        src = '#!%s\n' % self.shell
         src += 'set -o pipefail\nfunc () {\n  %s\n  return $?\n}\n' % body
         src += 'func\n'
         src += 'exit $?\n'
