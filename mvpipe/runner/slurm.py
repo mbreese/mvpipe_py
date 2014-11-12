@@ -1,12 +1,11 @@
 import os
-import os
 import string
 import subprocess
 
 import mvpipe.support
 from mvpipe.runner import Runner, Job
 
-def_options = {'env': True, 'wd': os.path.abspath(os.curdir), 'mail': 'ea', 'hold': False}
+def_options = {'env': True, 'wd': os.path.abspath(os.curdir), 'hold': False}
 
 '''
 SLURM options:
@@ -27,8 +26,6 @@ class SlurmRunner(Runner):
         self._holding_job = None
         self.global_depends = global_depends if global_depends else []
         self.account = account
-        self.parallelenv = parallelenv
-        self.hvmem_total = hvmem_total
 
         self.jobids = []
 
