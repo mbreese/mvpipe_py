@@ -5,7 +5,7 @@ import subprocess
 import mvpipe.support
 from mvpipe.runner import Runner, Job
 
-def_options = {'env': True, 'wd': os.path.abspath(os.curdir), 'hold': False}
+def_options = {'env': True, 'wd': os.path.abspath(os.curdir), 'hold': False, 'nodes': 1}
 
 '''
 SLURM options:
