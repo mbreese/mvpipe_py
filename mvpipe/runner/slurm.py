@@ -115,7 +115,7 @@ class SlurmRunner(Runner):
             src += '#SBATCH -t %s\n' % mvpipe.support.calc_time(jobopts['walltime'])
 
         if 'procs' in jobopts and int(jobopts['procs']) > 1:
-            src += '#SBATCH -n %s\n' % (jobopts['procs'])
+            src += '#SBATCH -c %s\n' % (jobopts['procs'])
 
         if 'nodes' in jobopts and int(jobopts['nodes']) > 1:
             src += '#SBATCH -N %s\n' % (jobopts['nodes'])
@@ -166,9 +166,13 @@ class SlurmRunner(Runner):
 
         src += 'set -o pipefail\nfunc () {\n  %s\n  return $?\n}\n' % body
 
-        src += 'func\n'
-        src += 'RETVAL=$?\n'
-        src += 'exit $RETVAL\n'
+        src += 'if [ "$0" == "" ]; then\n'
+        src += '    srun $0 run\n'
+        src += 'else\n'
+        src += '    func\n'
+        src += '    RETVAL=$?\n'
+        src += '    exit $RETVAL\n'
+        src += 'fi\n'
 
         if not self.dryrun:
             proc = subprocess.Popen(["sbatch", ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
