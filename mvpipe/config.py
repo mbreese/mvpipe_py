@@ -24,6 +24,11 @@ def get_config():
     return _config
 
 
+class ConfigError(Exception):
+    def __init__(self, s):
+        Exception.__init__(self, s)
+
+
 def load_config(defaults=None):
     global _config
 
@@ -67,10 +72,14 @@ def get_runner(dryrun=False, verbose=False, logger=None):
         return runner.bash.BashRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.bash.'))
 
     if _config['mvpipe.runner'] == 'sjq':
-        return runner.sjqrunner.SJQRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.sjq.'))
+        try:
+            import sjq
+            assert sjq
+            return runner.sjqrunner.SJQRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.sjq.'))
+        except:
+            raise ConfigError("Cannot load SJQ job runner")
 
     if _config['mvpipe.runner'] == 'slurm':
         return runner.slurm.SlurmRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.slurm.'))
 
-    return runner.get_runner()
-
+    raise ConfigError("Cannot load job runner: %s" % _config['mvpipe.runner'])
