@@ -24,6 +24,13 @@ include a grid-aware make replacement. However, it is primarily aimed at
 directly building Makefiles, and that is somewhat limiting for more
 complicated pipelines.
 
+MVpipe is designed to run jobs that don't span multiple nodes. Most
+bioinformatics pipelines require simple programs that execute on one node with
+one or more threads. More complicated, multi-node jobs (MPI), are likely better
+suited with custom execution scripts. We are willing to accept patches to
+better support multi-node jobs, but don't have a lot of internal experience
+with them.
+
 # Pipeline file syntax
 
 ## Evaluated lines
@@ -152,7 +159,6 @@ Example:
         gzip -c input1.txt > output1.txt.gz
         gzip -c input2.txt > output2.txt.gz
 
-
 You may also have more than one target definition for any given output
 file(s). In the event that there is more than one way to build an ouput,
 the first listed build definition will be tried first. If the needed inputs
@@ -222,3 +228,89 @@ You may also include the '$' and '@' characters in expressions or evaluated
 lines by escaping them with a '\' character before them, such as `\$`.
 
 
+# Pipeline runners (backends)
+
+Right now there are 4 available backends for running pipelines: a combined bash
+script (default), SGE/Open Grid Engine, SLURM, and a custom job-runner SJQ
+(simple job queue).
+
+Job runners are chosen by setting the configuration value `mvpipe.runner` in
+`$HOME/.mvpiperc` to either: 'sge', 'slurm', 'sjq', or 'bash' (default).
+
+## Single server backends
+
+The bash backend simply takes the computed pipeline and builds a bash script
+that can be executed. This script will maintain the proper dependency order of
+jobs, but will only execute jobs serially. If you want to execute jobs in
+parallel on a single workstation, you can use the SJQ runner. This is a
+single-workstation job queue runner that is included with MVpipe. SJQ will
+run jobs in a FIFO queue based upon their CPU and memory requirements. It is
+designed primarily for running pipelines for a single-user. For more
+information, see the SJQ Github site: https://github.com/mbreese/sjq.
+
+## HPC server backends
+
+The more common use-case for MVpipe, however, is running jobs within an HPC
+context. Currently, the only HPC job schedulers that are supported are SGE/Open
+Grid Engine and SLURM. MVpipe integrates with these schedulers by dynamically
+generating job scripts and submitting them to the scheduler by running
+scheduler-specific programs (qsub/sbatch).
+
+## Specifying requirements
+
+Resource requirements for each job (output-target) can be set on a per-job
+basis by setting MVpipe variables. Because of the way that variable scoping
+works, you can set any of the variables below at the script or job level.
+
+
+    setting name  | description                    | bash | sge | slurm | sjq |
+    -----------------------------------------------+------+-----+-------+-----|
+    job.name      | Name of the job                |      |  X  |   X   |  X  |
+    job.procs     | Number of CPUs (per node)      |      |  X  |   X   |  X  |
+    job.walltime  | Max wall time for the job      |      |  X  |   X   |     |
+    job.nodes     | Number of nodes to request     |      |  X  |   X   |     |
+    job.tasks     | Number of tasks                |      |     |   X   |     |
+    job.mem       | Req'd RAM (ex: 2M, 4G) [*]     |      |  X  |   X   |  X  |
+    job.stack     | Req'd stack space (ex: 10M)    |      |  X  |       |     |
+    job.hold      | Place a user-hold on the job   |      |  X  |   X   |  X  |
+    job.env       | Capture the current ENV vars   |      |  X  |   X   |  X  |
+    job.qos       | QoS setting                    |      |  X  |   X   |     |
+    job.wd        | Working directory              |      |  X  |   X   |  X  |
+    job.account   | Billing account                |      |  X  |   X   |     |
+    job.mail      | Mail job status                |      | [1] |  [2]  |     |
+    job.stdout    | Capture stdout to file         |      |  X  |   X   |  X  |
+    job.stderr    | Capture stderr to file         |      |  X  |   X   |  X  |
+
+    * - Memory should be specified as the total amount required for the job, if
+        required, MVpipe will re-calculate the per-processor required memory.
+    
+    1, 2 - job.mail has slightly different meanings for SGE and SLURM. For
+           each, it corresponds to the `-m` setting.
+
+
+### Runner specific settings
+
+You can set runner specific settings by setting config values in
+`$HOME/.mvpiperc`. These settings should be in the form:
+`mvpipe.runner.{runner_name}.{option}`.
+
+For SGE and SLURM, you can also set a global default account by using the
+`default_account` option.
+
+SGE, SLURM, and SJQ, you have two additional options: `global_hold` and
+`shell`. If `global_hold` is set to 'T', then a preliminary job will be
+submitted with a user-hold set. All of the rest of the jobs will include this
+as a dependency. Once the entire pipeline has been submitted (successfully),
+the user-hold will be released and the pipeline can start. This is useful to
+make sure that any step of the pipeline will run if and only if the entire
+pipeline was able to be submitted. This also makes sure that quick running
+jobs don't finish before their child jobs have been submitted. The `shell`
+option dictates the shell interpreter that will be used for the submitted
+job script. By default, MVpipe will look for `/bin/bash`, `/usr/bin/bash`, 
+`/usr/local/bin/bash`, or `/bin/sh` (in order of preference). 
+
+For SGE, there are two additional options: the name of the parallel
+environment needed to request more than one slot per node (`parallelenv`;
+`-pe` in qsub), and if the memory required should be specified per job or per
+slot (`hvmem_total`; `-l h_vmem` in qsub). The default parallelenv is named
+'shm' and by default `h_vmem` is specified on a per-slot basis (`hvmem_total=F`).

@@ -20,7 +20,7 @@ shell       - a shell to use for the script (default(s): /bin/bash, /usr/bin/bas
 
 '''
 class SlurmRunner(Runner):
-    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, interpreter=None):
+    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, shell=None):
         Runner.__init__(self, dryrun, verbose, logger)
         self.global_hold = global_hold
         self._holding_job = None
@@ -31,15 +31,15 @@ class SlurmRunner(Runner):
 
         self.testjobcount = 1
 
-        if interpreter:
-            self.interpreter = interpreter
+        if shell:
+            self.shell = shell
         else:
             for intp in ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash']:
                 if os.path.exists(intp):
-                    self.interpreter = intp
+                    self.shell = intp
                     break
-            if not self.interpreter:
-                self.interpreter = '/bin/sh'
+            if not self.shell:
+                self.shell = '/bin/sh'
 
 
     def reset(self):
@@ -102,7 +102,7 @@ class SlurmRunner(Runner):
         for k in job.args:
             jobopts[k] = job.args[k]
 
-        src = '#!%s\n' % self.interpreter
+        src = '#!%s\n' % self.shell
         src += '#SBATCH -J %s\n' % (job.name if job.name[0] in string.ascii_letters else 'mvp_%s' % job.name)
 
         if 'hold' in jobopts and jobopts['hold']:
@@ -116,6 +116,9 @@ class SlurmRunner(Runner):
 
         if 'procs' in jobopts and int(jobopts['procs']) > 1:
             src += '#SBATCH -c %s\n' % (jobopts['procs'])
+
+        if 'tasks' in jobopts and int(jobopts['tasks']) > 1:
+            src += '#SBATCH -n %s\n' % (jobopts['tasks'])
 
         if 'nodes' in jobopts and int(jobopts['nodes']) > 1:
             src += '#SBATCH -N %s\n' % (jobopts['nodes'])
