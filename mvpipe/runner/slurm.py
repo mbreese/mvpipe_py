@@ -3,6 +3,7 @@ import string
 import subprocess
 
 import mvpipe.support
+import mvpipe.config
 from mvpipe.runner import Runner, Job
 
 def_options = {'env': True, 'wd': os.path.abspath(os.curdir), 'hold': False, 'nodes': 1}
@@ -16,11 +17,9 @@ global_hold - start all pipelines with a "placeholder" job to synchronize
 
 account     - a default account to use
 
-shell       - a shell to use for the script (default(s): /bin/bash, /usr/bin/bash, /usr/local/bin/bash, /bin/sh)
-
 '''
 class SlurmRunner(Runner):
-    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, shell=None):
+    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None):
         Runner.__init__(self, dryrun, verbose, logger)
         self.global_hold = global_hold
         self._holding_job = None
@@ -30,17 +29,6 @@ class SlurmRunner(Runner):
         self.jobids = []
 
         self.testjobcount = 1
-
-        if shell:
-            self.shell = shell
-        else:
-            for intp in ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash']:
-                if os.path.exists(intp):
-                    self.shell = intp
-                    break
-            if not self.shell:
-                self.shell = '/bin/sh'
-
 
     def reset(self):
         pass
@@ -58,7 +46,7 @@ class SlurmRunner(Runner):
                 self.release(self._holding_job.jobid)
 
     def _setup_holding_job(self):
-        self._holding_job = Job('sleep 5', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null', walltime="00:00:30")
+        self._holding_job = Job('sleep 1', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null', walltime="00:00:30")
         self.submit(self._holding_job)
         self.global_depends.append(self._holding_job.jobid)
 
@@ -102,7 +90,12 @@ class SlurmRunner(Runner):
         for k in job.args:
             jobopts[k] = job.args[k]
 
-        src = '#!%s\n' % self.shell
+        if 'shell' in jobopts:
+            shell = jobopts['shell']
+        else:
+            shell = mvpipe.config.get_shell()
+
+        src = '#!%s\n' % shell
         src += '#SBATCH -J %s\n' % (job.name if job.name[0] in string.ascii_letters else 'mvp_%s' % job.name)
 
         if 'hold' in jobopts and jobopts['hold']:

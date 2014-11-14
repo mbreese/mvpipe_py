@@ -23,22 +23,26 @@ except:
 
 from mvpipe.support import autotype
 
-def usage():
+def usage(msg=None):
+    if msg:
+        sys.stderr.write('%s\n' % msg)
 
-    msg="""\
+    s="""\
 MVpipe - HPC/HTC analysis pipelines
 
-Usage: mvpipe {options} {args} target
+Usage: mvpipe {options} {args} filename {target1 target2...}
+
+Arguments:
+    filename       The filename of the pipeline to run
+    target         The output file you want to build
+                   (default: the first target in the pipeline)
 
 Options:
-    -f filename    Pipeline definition to be read (default: ./Pipeline)
     -l logfile     Log debug output to this file (default: none)
     -v             Verbose logging
     -dr            Dry run - don't actually submit jobs
 
-    target         The target to build (default: first target)
-
-    Additional arguments for the pipeline can be set by using the format:
+    Additional pipeline-specific arguments can be set by using the format:
         --foo bar --arg one --arg two
 
     This will set the variable "foo" to be "bar", and "arg" to be a list:
@@ -46,7 +50,7 @@ Options:
 
 """
 
-    sys.stderr.write(msg)
+    sys.stderr.write(s)
     sys.exit(1)
 
 if __name__ == '__main__':
@@ -62,13 +66,7 @@ if __name__ == '__main__':
         if i == 0 and os.path.exists(arg):
             fname = arg
         elif last:
-            if last == '-f':
-                if fname:
-                    sys.stderr.write("You can only specify one file (-f)!\n")
-                    sys.exit(1)
-                fname = arg
-                last = None
-            elif last == '-l':
+            if last == '-l':
                 logfile = arg
                 last = None
             elif last[:2] == '--':
@@ -93,6 +91,8 @@ if __name__ == '__main__':
             usage()
         elif arg[0] == '-':
             last = arg
+        elif not fname and os.path.exists(os.path.expanduser(arg)):
+            fname = arg
         else:
             target.append(arg)
         # else:

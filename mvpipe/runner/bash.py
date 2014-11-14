@@ -1,9 +1,9 @@
-import os
 import subprocess
+import mvpipe.config
 from mvpipe.runner import Runner
 
 class BashRunner(Runner):
-    def __init__(self, dryrun, verbose, logger, interpreter=None, autoexec=False):
+    def __init__(self, dryrun, verbose, logger, autoexec=False):
         Runner.__init__(self, dryrun, verbose, logger)
         self.funcs = []
         self.pre =  ''
@@ -13,18 +13,6 @@ class BashRunner(Runner):
         self.autoexec = autoexec
 
         self._name = 'bash-script'
-        if interpreter:
-            self.interpreter = interpreter
-        else:
-            for intp in ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash']:
-                if os.path.exists(intp):
-                    self.interpreter = intp
-                    break
-            if not self.interpreter:
-                self.interpreter = '/bin/sh'
-
-    def set_interpreter(self, interpreter):
-        self.interpreter = interpreter
 
     def reset(self):
         if self.body:
@@ -36,7 +24,8 @@ class BashRunner(Runner):
         self.reset()
         src = ''
         if self.out:
-            src += '#!%s\n' % self.interpreter
+            shell = mvpipe.config.get_shell()
+            src += '#!%s\n' % shell
             src += "set -o pipefail\n"
             src += '%s\n' % self.out
             src += '\n'
@@ -49,7 +38,7 @@ class BashRunner(Runner):
             print src
 
             if self.autoexec:
-                proc = subprocess.Popen([self.interpreter], stdin=subprocess.PIPE)
+                proc = subprocess.Popen([shell], stdin=subprocess.PIPE)
                 proc.communicate(input=src)
                 proc.wait()
 

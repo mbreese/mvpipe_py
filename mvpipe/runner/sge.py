@@ -3,6 +3,7 @@ import string
 import subprocess
 
 import mvpipe.support
+import mvpipe.config
 from mvpipe.runner import Runner, Job
 
 def_options = {'env': True, 'wd': os.path.abspath(os.curdir), 'mail': 'ea', 'hold': False}
@@ -27,7 +28,7 @@ shell       - a shell to use for the script (default(s): /bin/bash, /usr/bin/bas
 
 '''
 class SGERunner(Runner):
-    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, parallelenv='shm', hvmem_total=False, shell=None):
+    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, account=None, parallelenv='shm', hvmem_total=False):
         Runner.__init__(self, dryrun, verbose, logger)
         self.global_hold = global_hold
         self._holding_job = None
@@ -39,17 +40,6 @@ class SGERunner(Runner):
         self.jobids = []
 
         self.testjobcount = 1
-
-        if shell:
-            self.shell = shell
-        else:
-            for intp in ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash']:
-                if os.path.exists(intp):
-                    self.shell = intp
-                    break
-            if not self.shell:
-                self.shell = '/bin/sh'
-
 
     def reset(self):
         pass
@@ -67,7 +57,7 @@ class SGERunner(Runner):
                 self.qrls(self._holding_job.jobid)
 
     def _setup_holding_job(self):
-        self._holding_job = Job('sleep 5', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null', walltime="00:00:30")
+        self._holding_job = Job('sleep 1', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null', walltime="00:00:30")
         self.submit(self._holding_job)
         self.global_depends.append(self._holding_job.jobid)
 
@@ -90,11 +80,16 @@ class SGERunner(Runner):
         if self.global_hold and not self._holding_job:
             self._setup_holding_job()
 
+        jobopts = dict(def_options)
+        for k in job.args:
+            jobopts[k] = job.args[k]
+
         body = ''
 
-        if job.pre:
-            body = job.pre
-            body += '\n'
+        if not 'nopre' in jobopts or not jobopts['nopre']:
+            if job.pre:
+                body = job.pre
+                body += '\n'
 
         body += job.src
 
@@ -102,11 +97,13 @@ class SGERunner(Runner):
             body += '\n'
             body += job.post
 
-        jobopts = dict(def_options)
-        for k in job.args:
-            jobopts[k] = job.args[k]
 
-        src = '#!%s\n' % self.shell
+        if 'shell' in jobopts:
+            shell = jobopts['shell']
+        else:
+            shell = mvpipe.config.get_shell()
+
+        src = '#!%s\n' % shell
         src += '#$ -w e\n'
         src += '#$ -terse\n'
         src += '#$ -N %s\n' % (job.name if job.name[0] in string.ascii_letters else 'mvp_%s' % job.name)

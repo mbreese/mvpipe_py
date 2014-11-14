@@ -10,6 +10,7 @@ import time
 import socket
 import string
 import multiprocessing
+import mvpipe.config
 from mvpipe.runner import Runner, Job
 
 import sjq.client
@@ -18,7 +19,7 @@ import sjq.server
 def_options = {'env': True, 'cwd': os.path.abspath(os.curdir)}
 
 class SJQRunner(Runner):
-    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None, shell=None):
+    def __init__(self, dryrun, verbose, logger, global_hold=False, global_depends=None):
         Runner.__init__(self, dryrun, verbose, logger)
         self.global_hold = global_hold
         self._holding_job = None
@@ -28,16 +29,6 @@ class SJQRunner(Runner):
 
         self.testjobcount = 1
         self._name = 'sjqjob'
-
-        if shell:
-            self.shell = shell
-        else:
-            for intp in ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash']:
-                if os.path.exists(intp):
-                    self.shell = intp
-                    break
-            if not self.shell:
-                self.shell = '/bin/sh'
 
         self.sjq = None
         if not self.dryrun:
@@ -77,7 +68,7 @@ class SJQRunner(Runner):
             self.sjq.close()
 
     def _setup_holding_job(self):
-        self._holding_job = Job('sleep 5', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null')
+        self._holding_job = Job('sleep 1', name="holding", hold=True, stdout='/dev/null', stderr='/dev/null')
         self.submit(self._holding_job)
         self.global_depends.append(self._holding_job.jobid)
 
@@ -163,8 +154,12 @@ class SJQRunner(Runner):
 
             depends = ':'.join(depids)
 
+        if 'shell' in jobopts:
+            shell = jobopts['shell']
+        else:
+            shell = mvpipe.config.get_shell()
 
-        src = '#!%s\n' % self.shell
+        src = '#!%s\n' % shell
         src += 'set -o pipefail\nfunc () {\n  %s\n  return $?\n}\n' % body
         src += 'func\n'
         src += 'RETVAL=$?\n'

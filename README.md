@@ -193,6 +193,18 @@ defined.
                       for example), the wildcard for output {num}. (Each
                       output filename can have at most one wildcard).
 
+### Special targets
+There are four special target names that can be added for any pipeline: 
+`__pre__`, `__post__`, `__setup__`, and `__teardown__`. These are target
+definitions that accept no input dependencies. `__pre__` is automatically
+added to the start of the body for all targets.  `__post__` is automatically
+added to the end of the body for all targets. `__setup__` and `__teardown__`
+will always run as the first and last job in the pipeline.
+
+You can selectively disable `__pre__` and `__post__` for any job by setting
+the variable `job.nopre` and `job.nopost`.
+
+
 ## Including other files
 Other Pileline files can be imported into the currently running Pipeline by
 using the `#$ include filename` directive. In this case, the directory of the
@@ -288,6 +300,10 @@ works, you can set any of the variables below at the script or job level.
     job.stdout     | Capture stdout to file        |      |  X  |   X   |  X  |
     job.stderr     | Capture stderr to file        |      |  X  |   X   |  X  |
     job.keepfailed | Keep outputs from failed jobs |  X   |  X  |   X   |  X  |
+    job.shell      | Job-specific shell binary     | [3]  |  X  |   X   |  X  |
+    job.exec       | Exec job; don't submit job    |      |  X  |   X   |  X  |
+    job.nopre      | Don't include global pre      | [4]  |  X  |   X   |  X  |
+    job.nopost     | Don't include global post     | [4]  |  X  |   X   |  X  |
 
     * - Memory should be specified as the total amount required for the job, if
         required, MVpipe will re-calculate the per-processor required memory.
@@ -295,6 +311,10 @@ works, you can set any of the variables below at the script or job level.
     1, 2 - job.mail has slightly different meanings for SGE and SLURM. For
            each, it corresponds to the `-m` setting.
 
+    3 - the shell for the bash runner can be set using the global shell config
+
+    4 - pre and post script are only included once for the bash runner, so if
+        any job includes pre or post, then the final script will as well.
 
 ### Runner specific settings
 
@@ -302,23 +322,37 @@ You can set runner specific settings by setting config values in
 `$HOME/.mvpiperc`. These settings should be in the form:
 `mvpipe.runner.{runner_name}.{option}`.
 
+For SGE, SLURM, and SJQ, you have the option: `global_hold`. If 
+`global_hold` is set to 'T', then a preliminary job will be submitted with a
+user-hold set. All of the rest of the jobs will include this as a dependency.
+Once the entire pipeline has been submitted (successfully), the user-hold will
+be released and the pipeline can start. This is useful to make sure that any 
+step of the pipeline will run if and only if the entire pipeline was able to 
+be submitted. This also makes sure that quick running jobs don't finish before
+their child jobs have been submitted. 
+
 For SGE and SLURM, you can also set a global default account by using the
 `default_account` option.
-
-SGE, SLURM, and SJQ, you have two additional options: `global_hold` and
-`shell`. If `global_hold` is set to 'T', then a preliminary job will be
-submitted with a user-hold set. All of the rest of the jobs will include this
-as a dependency. Once the entire pipeline has been submitted (successfully),
-the user-hold will be released and the pipeline can start. This is useful to
-make sure that any step of the pipeline will run if and only if the entire
-pipeline was able to be submitted. This also makes sure that quick running
-jobs don't finish before their child jobs have been submitted. The `shell`
-option dictates the shell interpreter that will be used for the submitted
-job script. By default, MVpipe will look for `/bin/bash`, `/usr/bin/bash`, 
-`/usr/local/bin/bash`, or `/bin/sh` (in order of preference). 
 
 For SGE, there are two additional options: the name of the parallel
 environment needed to request more than one slot per node (`parallelenv`;
 `-pe` in qsub), and if the memory required should be specified per job or per
 slot (`hvmem_total`; `-l h_vmem` in qsub). The default parallelenv is named
-'shm' and by default `h_vmem` is specified on a per-slot basis (`hvmem_total=F`).
+'shm' and by default `h_vmem` is specified on a per-slot basis
+(`hvmem_total=F`).
+
+The bash runner has one specific option that can be set: `autoexec`. If this
+is set, then instead of writing the assembled bash script to stdout, the 
+script will also be executed.
+
+### Specifying the shell to use
+
+MVpipe will attempt to find the correct shell interpreter to use for executing
+scripts. By default it will look for `/bin/bash`, `/usr/bin/bash`, 
+`/usr/local/bin/bash`, or `/bin/sh` (in order of preference). Alternatively,
+you may set the config value `mvpipe.shell` in the `$HOME/.mvpiperc` file to
+set a specific shell binary.
+
+The shell may also be chosen on a per-job basis by setting the `job.shell`
+variable for each job.
+

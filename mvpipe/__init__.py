@@ -50,8 +50,7 @@ class PipelineLoader(object):
 
     def close(self):
         self.runner_inst.done()
-        if self.is_setup:
-            self.teardown()
+        self.teardown()
 
         if self.logger:
             self.logger.close()
@@ -152,6 +151,7 @@ class PipelineLoader(object):
                 self.log('ERROR: %s\n[%s:%s] %s\n\n' % (e, fname, i+1, line), True)
                 f.close()
                 sys.exit(1)
+
         f.close()
 
         if fname != '-':
@@ -164,24 +164,27 @@ class PipelineLoader(object):
 
 
     def setup(self):
-        self.is_setup = True
         for tgt in self.context._targets:
             if '__setup__' in tgt.outputs:
                 cmd = tgt.eval_src()
                 self.log("[setup]")
                 for line in cmd.out:
                         self.log("setup: %s" % line.strip())
-                
-                if self.dryrun:
-                    return
 
-                proc = subprocess.Popen(cmd.out, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                out, err = proc.communicate()
-                if out:
-                    self.log("     : %s" % out)
-                if err:
-                    self.log("     : %s" % err, True)
+                src = '\n'.join(cmd.out)
+                kwargs = {}
+                target_vals = cmd._clonevals()
+                for k in target_vals:
+                    if k[:4] == 'job.':
+                        kwargs[k[4:]] = target_vals[k]
 
+                job = runner.Job(src, **kwargs)
+                return job
+        return None
+                # if self.dryrun:
+                #     return
+
+                # self.run_script('\n'.join(cmd.out))
 
     def teardown(self):
         for tgt in self.context._targets:
@@ -192,23 +195,36 @@ class PipelineLoader(object):
                     if line and line.strip():
                         self.log("teardown: %s" % line.strip())
 
-                if self.dryrun:
-                    return
+                src = '\n'.join(cmd.out)
+                kwargs = {}
+                target_vals = cmd._clonevals()
+                for k in target_vals:
+                    if k[:4] == 'job.':
+                        kwargs[k[4:]] = target_vals[k]
 
-                proc = subprocess.Popen(cmd.out, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                out, err = proc.communicate()
-                if out:
-                    self.log("     : %s" % out)
-                if err:
-                    self.log("     : %s" % err, True)
+                job = runner.Job(src, **kwargs)
+                return job
+        return None
 
+                # if self.dryrun:
+                #     return
 
+                # self.run_script('\n'.join(cmd.out))
 
+    def run_script(self, script):
+        shell = config.get_shell()
+        if not shell:
+            self.log("ERROR: MISSING SHELL")
+            raise ParseError("Valid shell can't be found! (%s)" % shell)
+
+        proc = subprocess.Popen([shell], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        out, err = proc.communicate('#!%s\n%s' % (shell, script))
+        if out:
+            self.log("     : %s" % out)
+        if err:
+            self.log("     : %s" % err, True)
 
     def build(self, target):
-        if not self.is_setup:
-            self.setup()
-
         self.log("***** STARTING BUILD *****")
         self.runner_inst.reset()
         self.missing = []
@@ -250,6 +266,13 @@ class PipelineLoader(object):
             joblist = lastjob.flatten()
             added = True
 
+            setup_job = self.setup()
+            if setup_job:
+                if setup_job.direct_exec:
+                    self.run_script(setup_job.src)
+                else:
+                    self.runner_inst.submit(setup_job)
+
             submitted = set()
             while added:
                 added = False
@@ -263,10 +286,17 @@ class PipelineLoader(object):
 
                     added = True
 
-                    # TODO - Support a job marked with "direct.exec" flag, 
-                    #        This should just run the job on the submission
-                    #        host without submitting it to the job runner
-                    self.runner_inst.submit(job)
+                    if job.direct_exec:
+                        self.run_script(job.src)
+
+                        for out in job.outputs:
+                            self.output_jobs[out] = 'direct'
+
+                    else:
+                        if setup_job:
+                            job.add_dep(setup_job)
+                        self.runner_inst.submit(job)
+                    
                     submitted.add(job)
 
                     if job.jobid:
@@ -298,6 +328,14 @@ class PipelineLoader(object):
                             self.output_jobs[out] = job.jobid
                             self.write_outfile(out, job.jobid)
 
+            teardown_job = self.teardown()
+            if teardown_job:
+                if teardown_job.direct_exec:
+                    self.run_script(teardown_job.src)
+                else:
+                    for job in submitted:
+                        teardown_job.add_dep(job)
+                    self.runner_inst.submit(teardown_job)
 
             if len(submitted) != len(joblist):
                 self.log("WARNING: Didn't submit as many jobs as we had in the build-graph!", True)

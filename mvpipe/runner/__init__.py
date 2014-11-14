@@ -26,8 +26,8 @@ class Job(object):
 
         self.src = src
         self.outputs = outputs if outputs else []
-        self.pre = pre
-        self.post = post
+        self._pre = pre
+        self._post = post
 
         if depends:
             self._depends = set(depends)
@@ -44,6 +44,26 @@ class Job(object):
                     break
 
     @property
+    def pre(self):
+        if 'nopre' in self.args and self.args['nopre']:
+            return None
+
+        return self._pre
+
+    @property
+    def post(self):
+        if 'nopost' in self.args and self.args['nopost']:
+            return None
+
+        return self._post
+
+    @property
+    def direct_exec(self):
+        if 'exec' in self.args and self.args['exec']:
+            return True
+        return False
+
+    @property
     def depids(self):
         depids = []
         for d in self._depends:
@@ -53,7 +73,6 @@ class Job(object):
                 depids.append(d.jobid)
 
         return depids
-
 
     def __repr__(self):
         return '<job: %s>' % ','.join(self.outputs)
@@ -109,7 +128,6 @@ class Runner(object):
                 sys.stderr.write('%s\n' % msg)
         else:
             sys.stderr.write('%s\n' % msg)
-
 
     @property
     def name(self):

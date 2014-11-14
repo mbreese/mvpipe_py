@@ -1,0 +1,18 @@
+
+__setup__:
+    #$ job.exec=T
+    touch setup
+
+__teardown__:
+    #$ job.exec=T
+    touch down
+
+all: test1
+
+test1: test2
+    sleep 20
+    touch test1
+
+test2:
+    #$ job.exec=T
+    touch test2

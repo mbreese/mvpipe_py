@@ -70,9 +70,22 @@ def config_prefix(prefix):
     return out
 
 
+def get_shell():
+    cfg = get_config()
+    shell = None
+    if 'mvpipe.shell' in cfg:
+        shell = cfg['mvpipe.shell']
+    
+    if not shell or not os.path.exists(shell):
+        for sh in ['/bin/bash', '/usr/bin/bash', '/usr/local/bin/bash', '/bin/sh']:
+            if os.path.exists(sh):
+                return sh
+
+    return shell
+
+
 def get_runner(dryrun=False, verbose=False, logger=None, global_hold=None):
     cfg = get_config()
-
 
     if cfg['mvpipe.runner'] == 'sge':
         runnercfg = config_prefix('mvpipe.runner.sge.')
