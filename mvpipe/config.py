@@ -3,7 +3,12 @@ import support
 import runner
 import runner.bash
 import runner.sge
-import runner.sjqrunner
+try:
+    import runner.sjqrunner
+    NOSJQ=False
+except:
+    NOSJQ=True
+    pass
 import runner.slurm
 import socket
 
@@ -65,23 +70,35 @@ def config_prefix(prefix):
     return out
 
 
-def get_runner(dryrun=False, verbose=False, logger=None):
+def get_runner(dryrun=False, verbose=False, logger=None, global_hold=None):
     cfg = get_config()
+
+
     if cfg['mvpipe.runner'] == 'sge':
-        return runner.sge.SGERunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.sge.'))
+        runnercfg = config_prefix('mvpipe.runner.sge.')
+        if global_hold is not None:
+            runnercfg['global_hold'] = global_hold
+
+        return runner.sge.SGERunner(dryrun=dryrun, verbose=verbose, logger=logger, **runnercfg)
 
     if cfg['mvpipe.runner'] == 'bash':
         return runner.bash.BashRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.bash.'))
 
     if cfg['mvpipe.runner'] == 'sjq':
-        try:
-            import sjq
-            assert sjq
-            return runner.sjqrunner.SJQRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.sjq.'))
-        except:
+        if NOSJQ:
             raise ConfigError("Cannot load SJQ job runner")
 
+        runnercfg = config_prefix('mvpipe.runner.sjq.')
+        if global_hold is not None:
+            runnercfg['global_hold'] = global_hold
+
+        return runner.sjqrunner.SJQRunner(dryrun=dryrun, verbose=verbose, logger=logger, **runnercfg)
+
     if cfg['mvpipe.runner'] == 'slurm':
-        return runner.slurm.SlurmRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.slurm.'))
+        runnercfg = config_prefix('mvpipe.runner.slurm.')
+        if global_hold is not None:
+            runnercfg['global_hold'] = global_hold
+
+        return runner.slurm.SlurmRunner(dryrun=dryrun, verbose=verbose, logger=logger, **runnercfg)
 
     raise ConfigError("Cannot load job runner: %s" % cfg['mvpipe.runner'])

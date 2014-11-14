@@ -1,0 +1,189 @@
+#!/usr/bin/env python
+'''
+Automates submitting tasks to a job scheduler for multiple input files
+'''
+
+import os
+import re
+import sys
+
+try:
+    import sjq
+except:
+    sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'sjq'))
+    try:
+        import sjq
+        assert sjq
+    except:
+        pass
+
+try:
+    import mvpipe
+except:
+    sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+    import mvpipe
+
+import mvpipe.config
+import mvpipe.runner
+import mvpipe.logger
+
+def usage():
+    print __doc__
+    print '''Usage: mvsub {job-args} commands... -- input_files
+
+One command is submitted to the job scheduler for each input file. If
+"{}" appears in a command argument (or job argument), it will be replaced
+with the current filename. You can also specify suffixes to remove from a 
+filename. For example, "{^.txt}.gz" would remove .txt from the filename, and
+add .gz. So, "filename.txt" would be replaced with "filename.txt". If the {}
+arg is "{%}", then the basename of the file is used, as opposed to the full
+path name. Similarly, {%^.txt} would use the basename and replace '.txt' in
+the filename.
+
+The first non-option argument is taken to be the start of the command-to-run.
+
+Example:
+    mvsub --walltime 2:00:00 --procs 4 run.sh {} \\> {^.txt}.log -- *.txt
+
+    For files "input1.txt" and "input2.txt" this would submit the following:
+    $ run.sh input1.txt > input1.log
+    $ run.sh input2.txt > input2.log
+
+Any valid MVpipe job requirement value can be specified as "--option value".
+    --name    
+    --procs   
+    --walltime
+    --nodes   
+    --tasks   
+    --mem     
+    --stack   
+    --hold    
+    --env     
+    --qos     
+    --wd      
+    --account 
+    --mail    
+    --stdout  
+    --stderr  
+
+Other job arguments:
+  -deps joblist   Add the jobslist as dependencies (should be colon separated)
+  -v              Verbose output (writes the submitted scripts to stdout)
+  -dr             Dry-run - don't submit jobs, just generate the scripts
+  -l logfile      Save output to a logfile
+
+'''
+    sys.exit(1)
+
+
+def _var_repl(arg, fname):
+    m = re.match('^(.*){(.*)}(.*)$', arg)
+    if m:
+        if m.group(2):
+            middle = m.group(2)
+            if middle[0] == '%':
+                fname = os.path.basename(fname)
+                middle = middle[1:]
+            if middle and middle[0] == '^':
+                repl = fname[:fname.rfind(middle[1:])]
+                return '%s%s%s' % (m.group(1), repl, m.group(3))
+        return '%s%s%s' % (m.group(1), fname, m.group(3))
+    else:
+        return arg
+
+
+def submit(cmd_ar, infiles, args=None, verbose=False, dryrun=False, deps=[], logfile=None):
+    log_inst = mvpipe.logger.FileLogger(logfile)
+
+    runner_inst = mvpipe.config.get_runner(dryrun, verbose, log_inst, global_hold=False)
+
+    if not infiles:
+        if not 'name' in args:
+            args['name'] = '%s' % (cmd_ar[0].replace('/','_'))
+
+        job = mvpipe.runner.Job(' '.join(cmd_ar), None, depends=deps, **args)
+        runner_inst.submit(job)
+
+    else:
+        for fname in infiles:
+            cmdargs = dict(args)
+            cmd_repl = []
+            job_resources = {}
+
+            for c in cmd_ar:
+                cmd_repl.append(_var_repl(c, fname))
+
+            if not 'name' in cmdargs:
+                cmdargs['name'] = ('%s.%s' % (cmd_ar[0], fname)).replace('/','_')
+
+            for k in cmdargs:
+                val = cmdargs[k]
+                if type(val) == str:
+                    job_resources[k] = _var_repl(val, fname)
+                else:
+                    job_resources[k] = val
+
+            job = mvpipe.runner.Job(' '.join(cmd_repl), None, depends=deps, **cmdargs)
+            runner_inst.submit(job)
+
+    runner_inst.done()
+
+
+if __name__ == '__main__':
+
+    in_cmd = False
+    in_files = False
+    in_args = True
+
+    resources = {'env': True}
+    cmd_ar = []
+    infiles = []
+    deps = []
+
+    verbose = False
+    dryrun = False
+    logfile = None
+
+    last = None
+    for arg in sys.argv[1:]:
+        if in_args:
+            if last == '-deps':
+                deps = arg.split(':')
+                last = None
+            elif last == '-l':
+                logfile = arg
+                last = None
+            elif last:
+                resources[last[1:]] = arg
+                last = None
+            elif arg == '-v':
+                verbose = True
+            elif arg == '-dr':
+                dryrun = True
+            elif arg in ['--hold', '--env']:
+                resources[arg[1:]] = True
+            elif arg[:2] == '--' or arg in ['-deps', 'l']:
+                if '=' in arg:
+                    sys.stderr.write('ERROR: format for arguments is: --key value, not --key=value\n')
+                    sys.exit(1)
+                last = arg
+            else:
+                in_args = False
+                in_cmd = True
+                cmd_ar.append(arg)
+
+        elif in_cmd:
+            if arg == '--':
+                in_files = True
+                in_cmd = False
+            else:
+                cmd_ar.append(arg)
+
+        elif in_files:
+            infiles.append(arg)
+
+
+    if not cmd_ar:
+        usage()
+
+    submit(cmd_ar, infiles, resources, verbose, dryrun, deps, logfile)

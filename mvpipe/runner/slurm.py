@@ -174,12 +174,18 @@ class SlurmRunner(Runner):
         src += 'else\n'
         src += '    func\n'
         src += '    RETVAL=$?\n'
-        src += '    if [ $RETVAL -ne 0 ]; then\n'
-        for out in job.outputs:
-            if not 'keepfailed' in jobopts or not jobopts['keepfailed']:
+
+        tmpbody = ''
+        if not 'keepfailed' in jobopts or not jobopts['keepfailed']:
+            for out in job.outputs:
                 if out[0] != '.':
-                    src += '        if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
-        src += '    fi\n'
+                    tmpbody += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
+        
+        if tmpbody:
+            src += 'if [ $RETVAL -ne 0 ]; then\n'
+            src += tmpbody
+            src += 'fi\n'
+
         src += '    exit $RETVAL\n'
         src += 'fi\n'
 
