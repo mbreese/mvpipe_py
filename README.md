@@ -39,7 +39,6 @@ other lines will be processed for variable substitutions and either
 written to the log file, or included in the target script.
 
 ## Variables
-
 `#$ foo = bar` Set a variable
 
 `#$ foo ?= bar` Set a variable if it hasn't already been set
@@ -58,7 +57,6 @@ This is the same as saying:
     #$ baz += 2
 
 ## Variable substitution
-
     ${var}          - Variable named "var". If "var" is a list, ${var} will
                       be replaced with a space-separated string with all
                       members of the list. **If "var" hasn't been set, then this
@@ -79,7 +77,6 @@ This is the same as saying:
                       {n} and {m} may be variables or integers
 
 ### Shell escaping
-
 You may also include the results from shell commands as well using the syntax
 `$(command)`. Anything surrounded by `$()` will be executed in the current shell.
 Anything written to stdout can be captured as a variable. 
@@ -90,7 +87,6 @@ Example:
     #$ submit_date = $(date)
 
 ## If/Else/Endif
-
 Basic syntax:
 
     #$ if [condition]
@@ -103,7 +99,6 @@ If clauses can be nested as needed, but you can only specify one clause at a
 time (there is no concept of foo==1 and bar==2)
 
 ### Conditions
-
 `#$ if ${foo}` - if the variable ${foo} was set
 `#$ if !${foo}` - if the variable ${foo} was not set
 
@@ -117,7 +112,6 @@ time (there is no concept of foo==1 and bar==2)
 
 
 ## For loops
-
 Basic syntax:
 
     #$ for i in {start}..{end}
@@ -133,7 +127,6 @@ Basic syntax:
     #$ done
 
 ## Build target definitions
-
 Targets are the files that you want to create. They are defined on a single
 line listing the outputs of the target, a colon (:), and any inputs that
 are needed to build the outputs.
@@ -169,7 +162,6 @@ In the event that a complete build tree can't be found, a ParseError will be
 thrown.
 
 ### Wildcards in targets
-
 Using wildcards, the above could also be rewritten like this:
 
     %.gz: $1
@@ -241,7 +233,6 @@ lines by escaping them with a '\' character before them, such as `\$`.
 
 
 # Pipeline runners (backends)
-
 Right now there are 4 available backends for running pipelines: a combined bash
 script (default), SGE/Open Grid Engine, SLURM, and a custom job-runner SJQ
 (simple job queue).
@@ -250,7 +241,6 @@ Job runners are chosen by setting the configuration value `mvpipe.runner` in
 `$HOME/.mvpiperc` to either: 'sge', 'slurm', 'sjq', or 'bash' (default).
 
 ## Single server backends
-
 The bash backend simply takes the computed pipeline and builds a bash script
 that can be executed. This script will maintain the proper dependency order of
 jobs, but will only execute jobs serially. If you want to execute jobs in
@@ -268,7 +258,6 @@ a traditional scheduler that allows back-filling.
 For more information on SJQ, see: https://github.com/mbreese/sjq.
 
 ## HPC server backends
-
 The more common use-case for MVpipe, however, is running jobs within an HPC
 context. Currently, the only HPC job schedulers that are supported are SGE/Open
 Grid Engine and SLURM. MVpipe integrates with these schedulers by dynamically
@@ -276,7 +265,6 @@ generating job scripts and submitting them to the scheduler by running
 scheduler-specific programs (qsub/sbatch).
 
 ## Specifying requirements
-
 Resource requirements for each job (output-target) can be set on a per-job
 basis by setting MVpipe variables. Because of the way that variable scoping
 works, you can set any of the variables below at the script or job level.
@@ -317,7 +305,6 @@ works, you can set any of the variables below at the script or job level.
         any job includes pre or post, then the final script will as well.
 
 ### Runner specific settings
-
 You can set runner specific settings by setting config values in
 `$HOME/.mvpiperc`. These settings should be in the form:
 `mvpipe.runner.{runner_name}.{option}`.
@@ -346,7 +333,6 @@ is set, then instead of writing the assembled bash script to stdout, the
 script will also be executed.
 
 ### Specifying the shell to use
-
 MVpipe will attempt to find the correct shell interpreter to use for executing
 scripts. By default it will look for `/bin/bash`, `/usr/bin/bash`, 
 `/usr/local/bin/bash`, or `/bin/sh` (in order of preference). Alternatively,
@@ -355,4 +341,26 @@ set a specific shell binary.
 
 The shell may also be chosen on a per-job basis by setting the `job.shell`
 variable for each job.
+
+### Direct execution of jobs
+Jobs can also be directly executed as part of the pipeline building process.
+Instead of submitting the jobs to a scheduler, the jobs can be put into a
+temporary shell script and executed directly. The global shell will be used
+to run the script. If you would like a job to just run directly without being
+scheduled, set the variable `job.exec=T`. `__setup__` and `__teardown__` can
+also be directly executed instead of scheduled.
+
+One use for this is to setup any output folders that may be required. For example:
+
+    __setup__:
+        #$ job.exec = T
+        mkdir -p output
+
+
+Another common use-case for this is having a `clean` target to remove all
+output files to perform a fresh set of calculations. For example:
+
+    clean:
+        #$ job.exec = T
+        rm *.bam
 
