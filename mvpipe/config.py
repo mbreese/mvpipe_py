@@ -33,7 +33,7 @@ def load_config(defaults=None):
     global _config
 
     if not _config:
-        _config = _defconfig
+        _config = dict(_defconfig)
 
     if os.path.exists(GLOBAL_CONFIG_FILE):
         with open(GLOBAL_CONFIG_FILE) as f:
@@ -58,20 +58,22 @@ def load_config(defaults=None):
 
 def config_prefix(prefix):
     out = {}
-    for k in _config:
+    cfg = get_config()
+    for k in cfg:
         if k[:len(prefix)] == prefix:
-            out[k[len(prefix):]] = _config[k]
+            out[k[len(prefix):]] = cfg[k]
     return out
 
 
 def get_runner(dryrun=False, verbose=False, logger=None):
-    if _config['mvpipe.runner'] == 'sge':
+    cfg = get_config()
+    if cfg['mvpipe.runner'] == 'sge':
         return runner.sge.SGERunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.sge.'))
 
-    if _config['mvpipe.runner'] == 'bash':
+    if cfg['mvpipe.runner'] == 'bash':
         return runner.bash.BashRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.bash.'))
 
-    if _config['mvpipe.runner'] == 'sjq':
+    if cfg['mvpipe.runner'] == 'sjq':
         try:
             import sjq
             assert sjq
@@ -79,7 +81,7 @@ def get_runner(dryrun=False, verbose=False, logger=None):
         except:
             raise ConfigError("Cannot load SJQ job runner")
 
-    if _config['mvpipe.runner'] == 'slurm':
+    if cfg['mvpipe.runner'] == 'slurm':
         return runner.slurm.SlurmRunner(dryrun=dryrun, verbose=verbose, logger=logger, **config_prefix('mvpipe.runner.slurm.'))
 
-    raise ConfigError("Cannot load job runner: %s" % _config['mvpipe.runner'])
+    raise ConfigError("Cannot load job runner: %s" % cfg['mvpipe.runner'])
