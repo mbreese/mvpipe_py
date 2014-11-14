@@ -30,26 +30,31 @@ class SJQRunner(Runner):
         self.testjobcount = 1
         self._name = 'sjqjob'
 
-        self.sjq = None
-        if not self.dryrun:
+        self._sjq = None
+
+    @property
+    def sjq(self):
+        if not self._sjq and not self.dryrun:
             try:
-                self.sjq = sjq.client.SJQClient(verbose)
+                self._sjq = sjq.client.SJQClient(self.verbose)
             except socket.error:
                 try:
-                    # TODO: When we daemonize this, we end up killing *this* process.
-                    #       So we need to spawn a subprocess to actually start the SJQ server
+                    # When we daemonize this, we end up forking *this* process, which
+                    # isn't quite what we want. So we need to spawn a subprocess to 
+                    # actually start the SJQ server
                     self.log("Missing SJQ server, starting one...")
                     p = multiprocessing.Process(target=sjq.server.start, args=(False, {'sjq.autoshutdown': True, 'sjq.waittime': 60, 'sjq.logfile': '~/.sjq.log'}, True))
                     p.start()
                     time.sleep(2)
-                    self.sjq = sjq.client.SJQClient(verbose)
+                    self._sjq = sjq.client.SJQClient(self.verbose)
                 except Exception, e:
                     print e
 
-        if not self.sjq:
-            self.log("Cannot start SJQ server - aborting!")
-            raise RuntimeError("Cannot start SJQ server - aborting!")
+            if not self._sjq:
+                self.log("Cannot start SJQ server - aborting!")
+                raise RuntimeError("Cannot start SJQ server - aborting!")
 
+        return self._sjq
 
     def reset(self):
         pass
@@ -73,7 +78,7 @@ class SJQRunner(Runner):
         self.global_depends.append(self._holding_job.jobid)
 
     def check_jobid(self, jobid):
-        if self.sjq:
+        if not self.dryrun:
             ret = self.sjq.status(jobid)
             for line in ret.split('\n'):
                 cols = line.strip().split('\t')
@@ -86,11 +91,11 @@ class SJQRunner(Runner):
         return False
 
     def release(self, jobid):
-        if self.sjq:
+        if not self.dryrun:
             self.sjq.release(jobid)
 
     def kill(self, jobid):
-        if self.sjq:
+        if not self.dryrun:
             self.sjq.kill(jobid)
 
     def submit(self, job):
