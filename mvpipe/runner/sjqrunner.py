@@ -167,7 +167,13 @@ class SJQRunner(Runner):
         src = '#!%s\n' % self.shell
         src += 'set -o pipefail\nfunc () {\n  %s\n  return $?\n}\n' % body
         src += 'func\n'
-        src += 'exit $?\n'
+        src += 'RETVAL=$?\n'
+        src += 'if [ $RETVAL -ne 0 ]; then\n'
+        for out in job.outputs:
+            if out[0] != '.':
+                src += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
+        src += 'fi\n'
+        src += 'exit $RETVAL\n'
 
         if not self.dryrun:
             ret = self.sjq.submit(src, procs=procs, mem=mem, stderr=stderr, stdout=stdout, env=env, cwd=cwd, name=name, uid=os.getuid(), gid=os.getgid(), depends=depends, hold=hold)

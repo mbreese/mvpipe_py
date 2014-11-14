@@ -16,6 +16,8 @@ class Job(object):
         hold    - this job should be held to be manually released by the user
         depends - a list of job-ids for jobs that this one depends on
 
+        The outputs are used by the job runners to output files if the job fails.
+
         '''
         self.jobid = None
 

@@ -69,16 +69,21 @@ class BashRunner(Runner):
             self.body += '%s\n' % src
 
             test=False
-
+            tmpbody = ''
             for out in job.outputs:
                 if out[0] != '.':
-                    if not test:
-                        self.body += 'if [ $? -ne 0 ]; then\n'
-                        test = True
+                    test = True
+                    tmpbody += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
 
-                    self.body += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
+
+            if test:
+                self.body += 'if [ $? -ne 0 ]; then\n'
+
+            self.body += tmpbody
+
             if test:
                 self.body += 'fi\n'
+
             self.body += '}\n'
 
             job.jobid = func
