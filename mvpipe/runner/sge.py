@@ -223,8 +223,9 @@ class SGERunner(Runner):
         src += '  if [ $RETVAL -ne 0 ]; then\n'
         src += '    kill_deps\n'
         for out in job.outputs:
-            if out[0] != '.':
-                src += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
+            if not 'keepfailed' in jobopts or not jobopts['keepfailed']:
+                if out[0] != '.':
+                    src += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
         # if monitor:
         #     src += '    "%s" "%s" failed "%s.$JOB_ID"\n' % (clustrun.CLUSTRUN_MON_BIN, monitor, cluster)
         src += '  fi\n'

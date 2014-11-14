@@ -270,23 +270,24 @@ basis by setting MVpipe variables. Because of the way that variable scoping
 works, you can set any of the variables below at the script or job level.
 
 
-    setting name  | description                    | bash | sge | slurm | sjq |
-    -----------------------------------------------+------+-----+-------+-----|
-    job.name      | Name of the job                |      |  X  |   X   |  X  |
-    job.procs     | Number of CPUs (per node)      |      |  X  |   X   |  X  |
-    job.walltime  | Max wall time for the job      |      |  X  |   X   |     |
-    job.nodes     | Number of nodes to request     |      |  X  |   X   |     |
-    job.tasks     | Number of tasks                |      |     |   X   |     |
-    job.mem       | Req'd RAM (ex: 2M, 4G) [*]     |      |  X  |   X   |  X  |
-    job.stack     | Req'd stack space (ex: 10M)    |      |  X  |       |     |
-    job.hold      | Place a user-hold on the job   |      |  X  |   X   |  X  |
-    job.env       | Capture the current ENV vars   |      |  X  |   X   |  X  |
-    job.qos       | QoS setting                    |      |  X  |   X   |     |
-    job.wd        | Working directory              |      |  X  |   X   |  X  |
-    job.account   | Billing account                |      |  X  |   X   |     |
-    job.mail      | Mail job status                |      | [1] |  [2]  |     |
-    job.stdout    | Capture stdout to file         |      |  X  |   X   |  X  |
-    job.stderr    | Capture stderr to file         |      |  X  |   X   |  X  |
+    setting name   | description                   | bash | sge | slurm | sjq |
+    ---------------+-------------------------------+------+-----+-------+-----|
+    job.name       | Name of the job               |      |  X  |   X   |  X  |
+    job.procs      | Number of CPUs (per node)     |      |  X  |   X   |  X  |
+    job.walltime   | Max wall time for the job     |      |  X  |   X   |     |
+    job.nodes      | Number of nodes to request    |      |  X  |   X   |     |
+    job.tasks      | Number of tasks               |      |     |   X   |     |
+    job.mem        | Req'd RAM (ex: 2M, 4G) [*]    |      |  X  |   X   |  X  |
+    job.stack      | Req'd stack space (ex: 10M)   |      |  X  |       |     |
+    job.hold       | Place a user-hold on the job  |      |  X  |   X   |  X  |
+    job.env        | Capture the current ENV vars  |      |  X  |   X   |  X  |
+    job.qos        | QoS setting                   |      |  X  |   X   |     |
+    job.wd         | Working directory             |      |  X  |   X   |  X  |
+    job.account    | Billing account               |      |  X  |   X   |     |
+    job.mail       | Mail job status               |      | [1] |  [2]  |     |
+    job.stdout     | Capture stdout to file        |      |  X  |   X   |  X  |
+    job.stderr     | Capture stderr to file        |      |  X  |   X   |  X  |
+    job.keepfailed | Keep outputs from failed jobs |  X   |  X  |   X   |  X  |
 
     * - Memory should be specified as the total amount required for the job, if
         required, MVpipe will re-calculate the per-processor required memory.

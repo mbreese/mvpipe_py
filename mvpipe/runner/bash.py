@@ -71,9 +71,10 @@ class BashRunner(Runner):
             test=False
             tmpbody = ''
             for out in job.outputs:
-                if out[0] != '.':
-                    test = True
-                    tmpbody += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
+                if not 'keepfailed' in job.args or not job.args['keepfailed']:
+                    if out[0] != '.':
+                        test = True
+                        tmpbody += '    if [ -e "%s" ]; then rm "%s"; fi\n' % (out, out)
 
 
             if test:
