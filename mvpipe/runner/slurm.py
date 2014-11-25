@@ -138,13 +138,13 @@ class SlurmRunner(Runner):
                 src += '#SBATCH -d afterok:%s\n' % ':'.join(depids)
 
         if 'qos' in jobopts:
-            src += '#SBATCH --qos %s\n' % jobopts['qos']
+            src += '#SBATCH --qos=%s\n' % jobopts['qos']
 
-        # if 'queue' in jobopts:
-        #     src += '#$ -q %s\n' % jobopts['queue']
+        if 'priority' in jobopts:
+            src += '#SBATCH --priority=%s\n' % jobopts['priority']
 
         if 'mail' in jobopts:
-            src += '#SBATCH --mail-type %s\n' % jobopts['mail']
+            src += '#SBATCH --mail-type=%s\n' % jobopts['mail']
 
         if 'wd' in jobopts:
             src += '#SBATCH -D %s\n' % jobopts['wd']

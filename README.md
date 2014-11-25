@@ -292,6 +292,7 @@ works, you can set any of the variables below at the script or job level.
     job.exec       | Exec job; don't submit job    |      |  X  |   X   |  X  |
     job.nopre      | Don't include global pre      | [4]  |  X  |   X   |  X  |
     job.nopost     | Don't include global post     | [4]  |  X  |   X   |  X  |
+    job.priority   | Priority of the job           |      |  X  |   X   |     |
 
     * - Memory should be specified as the total amount required for the job, if
         required, MVpipe will re-calculate the per-processor required memory.
