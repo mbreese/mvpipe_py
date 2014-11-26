@@ -83,7 +83,7 @@ class SJQRunner(Runner):
             for line in ret.split('\n'):
                 cols = line.strip().split('\t')
                 if cols[0] == str(jobid):
-                    if cols[2] in ['H', 'Q', 'U']:
+                    if cols[2] in ['H', 'Q', 'U', 'R']:
                         # If the status is anything other than these, then
                         # the output file should have been made or won't be.
                         return True
