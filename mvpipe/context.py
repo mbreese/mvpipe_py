@@ -437,9 +437,8 @@ class ElseContext(ExecContext):
 
     def eval_line(self, line):
         if line[:2] == '#$':
-            for op in [ops.endifop,]:
-                if op(self, line[2:].strip()):
-                    return True
+            if ops.endifop(self, line[2:].strip()):
+                return True
 
         return ExecContext.eval_line(self, line)
 

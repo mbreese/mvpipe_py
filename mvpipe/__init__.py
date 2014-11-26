@@ -266,7 +266,7 @@ class PipelineLoader(object):
 
             if not lastjob:
                 # nothing to do...
-                sys.stderr.write('Nothing to do...')
+                sys.stderr.write('Nothing to do...\n')
                 self.log('Nothing to do...')
                 return
             joblist = lastjob.flatten()

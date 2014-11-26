@@ -73,25 +73,28 @@ regex_ifnot = re.compile('^if[ \t]+\![ \t]*(\$\{[^ \t]+\??\})$')
 def ifop(context, line):
     m = regex_if.match(line)
     if m:
-        l = autotype(context.replace_token(m.group(1)))
-        op = m.group(2)
-        r = autotype(m.group(3))
-
-        test = False
-        if op == '==':
-            test = l == r
-        elif op == '<':
-            test = l < r
-        elif op == '>':
-            test = l > r
-        elif op == '<=':
-            test = l <= r
-        elif op == '>=':
-            test = l >= r
-        elif op == '!=':
-            test = l != r
+        if not context.active:
+            test = False
         else:
-            raise mvpipe.ParseError("Unknown test operator: %s" % op)
+            l = autotype(context.replace_token(m.group(1)))
+            op = m.group(2)
+            r = autotype(m.group(3))
+
+            test = False
+            if op == '==':
+                test = l == r
+            elif op == '<':
+                test = l < r
+            elif op == '>':
+                test = l > r
+            elif op == '<=':
+                test = l <= r
+            elif op == '>=':
+                test = l >= r
+            elif op == '!=':
+                test = l != r
+            else:
+                raise mvpipe.ParseError("Unknown test operator: %s" % op)
 
         context.child = mvpipe.context.IfContext(context, test)
 
@@ -99,20 +102,26 @@ def ifop(context, line):
 
     m = regex_ifset.match(line)
     if m:
-        l = autotype(context.replace_token(m.group(1), allow_missing=True))
-        test = False
-        if l:
-            test = True
+        if not context.active:
+            test = False
+        else:
+            l = autotype(context.replace_token(m.group(1), allow_missing=True))
+            test = False
+            if l:
+                test = True
 
         context.child = mvpipe.context.IfContext(context, test)
         return True
 
     m = regex_ifnot.match(line)
     if m:
-        l = autotype(context.replace_token(m.group(1), allow_missing=True))
-        test = True
-        if l:
+        if not context.active:
             test = False
+        else:
+            l = autotype(context.replace_token(m.group(1), allow_missing=True))
+            test = True
+            if l:
+                test = False
 
         context.child = mvpipe.context.IfContext(context, test)
         return True
@@ -153,18 +162,20 @@ def forop(context, line):
     m = regex_for.match(line)
     if m:
         var = m.group(1)
-        varlist = None
-        if '..' in m.group(2):
-            spl = [x.strip() for x in m.group(2).split('..')]
+        varlist = []
 
-            frm = autotype(context.replace_token(spl[0]))
-            to = autotype(context.replace_token(spl[1]))
+        if context.active:
+            if '..' in m.group(2):
+                spl = [x.strip() for x in m.group(2).split('..')]
 
-            if type(frm) == int and type(to) == int:
-                varlist = range(frm, to+1)
+                frm = autotype(context.replace_token(spl[0]))
+                to = autotype(context.replace_token(spl[1]))
 
-        else:
-            varlist = m.group(2).split()
+                if type(frm) == int and type(to) == int:
+                    varlist = range(frm, to+1)
+
+            else:
+                varlist = m.group(2).split()
 
         if varlist:
             context.child = mvpipe.context.ForContext(context, var, varlist)
