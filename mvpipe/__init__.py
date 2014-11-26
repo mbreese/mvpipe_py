@@ -62,6 +62,9 @@ class PipelineLoader(object):
 
     def set_log(self, fname):
         if self.logger:
+            if not os.path.exists(os.path.dirname(fname)):
+                os.makedirs(os.path.dirname(fname))
+
             self.logger.set_fname(fname)
 
     def write_outfile(self, outfile, jobid):
@@ -73,7 +76,8 @@ class PipelineLoader(object):
         self.log("Setting output-file: %s" % fname)
         self._outfile = fname
         self.outfile_jobids = {}
-
+        if not os.path.exists(os.path.dirname(fname)):
+            os.makedirs(os.path.dirname(fname))
         if not os.path.exists(fname):
             f = open(fname, 'w')
             f.close()
