@@ -296,7 +296,7 @@ class PipelineLoader(object):
                         self.run_script(job.src)
 
                         for out in job.outputs:
-                            self.output_jobs[out] = 'direct'
+                            self.output_jobs[out] = '__direct_exec__'
 
                     else:
                         if setup_job:
@@ -375,6 +375,8 @@ class PipelineLoader(object):
                 if valid:
                     self.log('%s - %s already set to be built by existing job (%s)' % (indentstr, target, self.outfile_jobids[target]))
                     return True, self.outfile_jobids[target]
+                else:
+                    self.log('%s - %s already set to be built by existing job (%s), but it is no longer valid!' % (indentstr, target, self.outfile_jobids[target]))
 
         target_found = False
         
