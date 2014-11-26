@@ -147,8 +147,8 @@ class SGERunner(Runner):
             if depids:
                 src += '#$ -hold_jid %s\n' % ','.join(depids)
 
-        if 'priority' in jobopts:
-            src += '#$ -p %s\n' % jobopts['priority']
+        # if 'priority' in jobopts:
+        #     src += '#$ -p %s\n' % jobopts['priority']
 
         if 'qos' in jobopts:
             # this is actually the "Project" in SGE terms
