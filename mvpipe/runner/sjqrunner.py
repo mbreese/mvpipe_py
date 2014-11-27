@@ -147,10 +147,10 @@ class SJQRunner(Runner):
             cwd = jobopts['wd']
 
         if 'stdout' in jobopts:
-            stdout = jobopts['stdout']
+            stdout = os.path.abspath(jobopts['stdout'])
 
         if 'stderr' in jobopts:
-            stderr = jobopts['stderr']
+            stderr = os.path.abspath(jobopts['stderr'])
 
         if job.depids or self.global_depends:
             depids = job.depids
