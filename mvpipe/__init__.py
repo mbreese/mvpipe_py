@@ -101,7 +101,7 @@ class PipelineLoader(object):
         if self.logger:
             self.logger.write(msg)
             if stderr:
-                sys.stderr.write(msg)
+                sys.stderr.write('%s\n' % msg)
         elif self.verbose:
             sys.stderr.write('%s\n' % msg)
 
