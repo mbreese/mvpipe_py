@@ -345,8 +345,8 @@ class PipelineLoader(object):
 
             if len(submitted) != len(joblist):
                 self.log("WARNING: Didn't submit as many jobs as we had in the build-graph!", True)
-            self.log("Build-list: %s" % ','.join([str(x) for x in joblist]), True)
-            self.log("Submitted : %s" % ','.join([str(x) for x in submitted]), True)
+                self.log("Build-list: %s" % ','.join([str(x) for x in joblist]), True)
+                self.log("Submitted : %s" % ','.join([str(x) for x in submitted]), True)
 
         else:
             if self.missing:
