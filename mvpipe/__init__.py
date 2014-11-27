@@ -144,12 +144,14 @@ class PipelineLoader(object):
             if line[:2] == '##':
                 continue
 
-            if line[:2] == '#$':
-                spl = line[2:].split('#')
-                line = '#$%s' % spl[0]
-                line = line.strip()
-                if not line:
-                    continue
+            # TODO: find a better way to strip comments from 
+            #       the script... maybe...
+            # if line[:2] == '#$':
+            #     spl = line[2:].split('#')
+            #     line = '#$%s' % spl[0]
+            #     line = line.strip()
+            #     if not line:
+            #         continue
 
             try:
                 self.context.parse_line(line)
