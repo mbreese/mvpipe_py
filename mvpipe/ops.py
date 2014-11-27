@@ -1,5 +1,4 @@
 import re
-import sys
 import mvpipe
 from mvpipe.support import autotype
 

@@ -11,9 +11,9 @@ def autotype(val):
             ret = float(val)
             return ret
         except:
-            if val.upper() in ['T', 'TRUE', 'Y', 'YES']:
+            if val.upper() in ['T', 'TRUE']:
                 return True
-            if val.upper() in ['F', 'FALSE', 'N', 'NO']:
+            if val.upper() in ['F', 'FALSE']:
                 return False
 
             if val[0] == '"' and val[-1] == '"':
