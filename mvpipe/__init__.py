@@ -279,7 +279,7 @@ class PipelineLoader(object):
                 else:
                     self.runner_inst.submit(setup_job)
 
-            submitted = set()
+            submitted = []
             while added:
                 added = False
                 for job in joblist:
@@ -287,7 +287,7 @@ class PipelineLoader(object):
                         continue
 
                     if type(job) == str:
-                        submitted.add(job)
+                        submitted.append(job)
                         continue
 
                     added = True
@@ -303,7 +303,7 @@ class PipelineLoader(object):
                             job.add_dep(setup_job)
                         self.runner_inst.submit(job)
                     
-                    submitted.add(job)
+                    submitted.append(job)
 
                     if job.jobid:
                         self.log("Submitted job: %s %s" % (job.jobid, job.name))

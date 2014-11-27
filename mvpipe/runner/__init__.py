@@ -93,7 +93,8 @@ class Job(object):
         
         for d in self._depends:
             if type(d) == str:
-                l.append(d)
+                if not d in l:
+                    l.append(d)
             else:
                 d.flatten(l)
 
