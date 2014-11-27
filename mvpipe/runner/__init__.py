@@ -75,7 +75,7 @@ class Job(object):
         return depids
 
     def __repr__(self):
-        return '<job: %s>' % ','.join(self.outputs)
+        return '<%s: %s>' % (self.name, ','.join(self.outputs))
 
     def add_dep(self, dep):
         self._depends.add(dep)
