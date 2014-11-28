@@ -1,5 +1,7 @@
 import os
 import sys
+import stat
+import tempfile
 import subprocess
 
 import context
@@ -225,12 +227,21 @@ class PipelineLoader(object):
             self.log("ERROR: MISSING SHELL")
             raise ParseError("Valid shell can't be found! (%s)" % shell)
 
-        proc = subprocess.Popen([shell], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        out, err = proc.communicate('#!%s\n%s' % (shell, script))
+        (fd, fname) = tempfile.mkstemp()
+        fobj = os.fdopen(fd, 'w')
+        fobj.write('#!%s\n%s' % (shell, script))
+        fobj.close()
+        os.chmod(fname, stat.S_IRUSR | stat.S_IXUSR)
+
+        proc = subprocess.Popen([fname], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        out, err = proc.communicate()
         if out:
             self.log("     : %s" % out)
         if err:
             self.log("     : %s" % err, True)
+
+        proc.wait()
+        os.unlink(fname)
 
     def build(self, target):
         self.log("***** STARTING BUILD *****")
