@@ -192,7 +192,10 @@ class SGERunner(Runner):
         src += '}\n'
 
         src += 'kill_deps() {\n'
-        src += '  qdel $(qstat -f -j $JOB_ID | grep jid_successor_list | awk \'{print $2}\' | sed -e \'s/,/ /g\')\n'
+        src += '  DEPS="$(qstat -f -j $JOB_ID | grep jid_successor_list | awk \'{print $2}\' | sed -e \'s/,/ /g\')"\n'
+        src += '  if [ "$DEPS" != "" ]; then\n'
+        src += '    qdel $DEPS\n'
+        src += '  fi\n'
         src += '}\n'
 
         src += 'trap notify_stop SIGUSR1\n'
